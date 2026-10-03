@@ -123,22 +123,39 @@ return function()
         }
     end
 
-    local texts = {new=function(_, cfg)
-        cfg.text.fonts = cfg.text.fonts or {}
-        cfg.flags.italic = cfg.flags.italic or false
-        cfg.flags.right = cfg.flags.right or false
-        cfg.flags.bottom = cfg.flags.bottom or false
-        local box = {_x=cfg.pos and cfg.pos.x or 0, _y=cfg.pos and cfg.pos.y or 0}
-        return setmetatable(box, {__index=function(_, key)
-            if key == 'pos' then
-                return function(self, x, y)
-                    if x then self._x, self._y = x, y else return self._x, self._y end
-                end
-            end
-            if key == 'extents' then return function() return 100, 20 end end
-            return function() return true end
-        end})
-    end}
+    local created_fonts = {}
+    local fonts = {
+        new=function(settings)
+            local font = {
+                visible=settings.visible,
+                locked=settings.locked,
+                can_focus=settings.can_focus,
+                font_family=settings.font_family,
+                font_height=settings.font_height,
+                bold=settings.bold,
+                italic=settings.italic,
+                right_justified=settings.right_justified,
+                color=settings.color,
+                color_outline=settings.color_outline,
+                padding=settings.padding,
+                position_x=settings.position_x,
+                position_y=settings.position_y,
+                text=settings.text,
+                background={
+                    visible=settings.background and settings.background.visible or false,
+                    color=settings.background and settings.background.color or 0,
+                    locked=settings.background and settings.background.locked or false,
+                    can_focus=settings.background and settings.background.can_focus or false,
+                },
+            }
+            function font:get_text_size() return 100, 20 end
+            function font:register() return true end
+            function font:unregister() return true end
+            function font:destroy() return true end
+            created_fonts[#created_fonts + 1] = font
+            return font
+        end,
+    }
 
     local display_hides, display_destroys = 0, 0
     local display = {
@@ -168,7 +185,7 @@ return function()
         ipc_to_rahvin=function(payload) return payload and payload.message or nil end,
         gData=gData,
         gFunc=gFunc,
-        texts=texts,
+        fonts=fonts,
         snapshot=snapshot,
         job_path='tests/fixtures/production_job',
         settings=settings,
@@ -183,6 +200,9 @@ return function()
     a.equal(type(graph.profile), 'table', 'composition must return the installable LAC profile')
     a.equal(type(graph.platform), 'table', 'composition must expose its shared platform for diagnostics')
     a.equal(type(graph.env), 'table', 'composition must expose the Rahvin execution environment')
+    a.equal(type(graph.env.texts), 'table', 'composition must install Ashita-backed texts compatibility')
+    a.equal(type(graph.env.texts.new), 'function', 'production texts compatibility must expose new')
+    a.equal(#created_fonts >= 2, true, 'unchanged Rahvin core must create status/debug Ashita font objects')
     a.equal(type(graph.engine), 'table', 'composition must bind Rahvin globals as one engine adapter')
     a.equal(type(graph.lifecycle), 'table', 'composition must build lifecycle around the same graph')
     a.equal(type(graph.runtime_events), 'table', 'composition must build runtime events around the same platform')
