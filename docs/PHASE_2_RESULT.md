@@ -1,52 +1,67 @@
 # Phase 2 result — Core Gear Parity
 
-Phase 2 completed on 2026-10-03 directly on `master`, starting from
-`8070cc78234c37863253bbe78d7744ed92f37095`.
+Phase 2 was completed on 2026-10-03 directly on `master`, starting from
+`8070cc78234c37863253bbe78d7744ed92f37095`, then independently re-audited before Phase 3.
+The audit baseline was `d973c5100be358215ab24574cfaf3469b839a71c`.
 
-## Tasks and commits
+## Implemented contracts
 
-| Task | Commit | Result |
-|---|---|---|
-| LAC action and entity translation | `bb42b07` | Translates the documented pinned-LAC action, target, player, pet, day and weather fields into Rahvin-shaped data. |
-| LAC equipment backend | `e069dd8` | Buffers precedence-preserving logical equips and flushes only through `EquipSet`; enable, disable and cancellation use public `gFunc` calls. |
-| Exactly-once action lifecycle | `cd70cc2` | Owns start generations and emits one aftercast for completion, interruption, cancellation, replacement or reset. |
-| LuAshitacast bootstrap/profile | `02ef60d` | Routes every callback supported by the pinned LAC profile interface and uses `HandleDefault` for completion and default rebuilds. |
-| State transition bridge | `82060b1` | Diffs status, counted buffs and pet identity and defers transitions across busy windows without losing them. |
-| Core logical-set parity contracts | `618b2c6` | Locks pre-LAC GearSwap-shaped merge results for the required default, mode, action and exception cases. |
-| GearSwap action taxonomy correction | `419511d` | Converts LAC action/type names to the exact strings consumed by Rahvin. |
-| Element and target semantics correction | `b5d4e35` | Supplies actual resource element IDs, weather intensity and GearSwap entity categories. |
-| Deployable profile callback surface | `49b8f73` | Exposes the exact pinned-LAC callback table and fails explicitly until dependencies are configured. |
-| Repeated-start lifecycle hardening | `3fc0363` | Makes repeat callbacks for the same active identity idempotent. |
+- LAC action/entity translation into Rahvin/GearSwap-shaped data.
+- Public LuAshitacast equipment backend through `gFunc.EquipSet`, `Enable`, `Disable`, and `CancelAction`.
+- Exactly-once synthetic Rahvin `aftercast` lifecycle over the pinned LuAshitacast callback model.
+- LuAshitacast profile/bootstrap callback surface.
+- Status, buff, and pet transition bridge.
+- Pre-LAC logical gear decisions from the unchanged Rahvin builders.
 
-## Tested contracts
+## Audit corrections
 
-- Spell, weaponskill, job ability, ranged attack, item and nil-action translation.
-- Player, pet, target, day, weather, element, skill, action type and available recast identity.
-- Public `gFunc.EquipSet`, `Enable`, `Disable` and `CancelAction` routing; no normal-flow `ForceEquip`.
-- Buffered precedence and preservation of item descriptor fields and distinct augmented instances.
-- Exactly-once aftercast for success, disappearance, interruption, cancellation, replacement and zone/reset paths.
-- All pinned-LAC profile callbacks and `HandleDefault` completion/default routing.
-- Idle, Engaged and Resting changes; counted duplicate buffs; pet appearance/disappearance; unchanged snapshots; busy deferral.
-- Logical idle/engaged and offense-mode sets, named and ranged weaponskills, Aftermath, weapon locks, wield state, movement, buff and elemental overlays, Cure/Light bonus, Bard instrument and GEO handbell exceptions.
+The independent Phase 2 audit found and corrected several cases that the original tests did not cover:
 
-## Known limits and live verification gates
+- Geomancy and Trust are recovered from the pinned Ashita spell resource `MagicType` when LAC reports `Unknown`.
+- Spell `recast_id` follows Windower/GearSwap spell-id semantics; ability/WS recasts remain resource `RecastTimerId` based.
+- Ability families such as Ready/PetCommand, Blood Pacts, Corsair Roll/Shot, Samba, Waltz, Step, Flourish1/2/3, Scholar, Jig, Rune, Ward, and Effusion are classified from the pinned Ashita ability resource type instead of falling through to `JobAbility`.
+- A player-like action target whose name matches `GetPlayer().Name` is classified as `SELF`; other PC/party/alliance targets remain `PLAYER`.
+- LAC `Resend` is propagated. Only a genuine resend of the same action is idempotent; two identical non-resend actions are separate generations and each receives exactly one aftercast.
+- `status_change` and `pet_change` are not blanket-deferred by the adapter busy state. Buff changes retain the deferred behavior needed around Rahvin's busy window.
+- Bootstrap tests now model pinned-LAC ordering: spell precast→midcast, ranged preshot→midshot, and `HandleDefault` only after `PlayerAction` has cleared.
+- Core parity now executes the unchanged Rahvin engine/builders in a controlled harness and captures the actual logical GearSwap-shaped result before LuAshitacast slot translation. The old layer-precedence fixture remains only as a separate merge-order regression test.
 
-The automated suite deliberately does not simulate behavior that only the live client and
-LuAshitacast equipment engine can establish. The following remain live Ashita/FFXI gates:
+## Automated verification
 
-- exact callback and `HandleDefault` timing for success, packet interruption and server rejection;
-- real buffered equip timing across fast-cast, midcast, ranged and default transitions;
-- LAC selection of duplicate augmented items from real wardrobes and bags;
-- actual `Enable`/`Disable` persistence and action cancellation in the client;
-- resource-provided recast IDs on every action family;
-- self-target classification, because pinned LAC `GetPlayer()` exposes no player ID or index;
-- live buff enumeration and pet/status timing supplied by the Ashita snapshot provider;
-- job-file loading/configuration and normal combat execution inside a running client.
+The full Termux/LuaJIT suite was run after the audit fixes at executable commit
+`bdd8e339ef18c709410883ca53ceb49d4abd25b8`:
 
-These are integration gates, not silent compatibility claims. Missing adapter services raise
-`RahvinCompatError` rather than manufacturing data.
+```text
+RESULT 18 passed, 0 failed
+```
 
-## Upstream patches
+The suite covers, among other contracts:
 
-No Class-C patches were required. `RahvinGS/` and `Sample Job Files/` remain byte-unchanged
-from the port baseline, and `docs/UPSTREAM_PATCH_LEDGER.md` remains empty.
+- spell, weaponskill, job ability, ranged attack, item, Geomancy, Trust, and nil-action translation;
+- player/pet/target/day/weather/element/skill/recast translation and SELF/PLAYER/NPC/MONSTER target semantics;
+- the expanded Rahvin action-family taxonomy;
+- buffered equipment precedence and augmented item descriptor preservation;
+- exactly-once aftercast for completion, interruption, cancellation, replacement, reset, resend, and identical sequential non-resend actions;
+- pinned-LAC callback ordering and default/completion routing;
+- status, counted buff, and pet transitions with the corrected busy semantics;
+- real Rahvin builder decisions for idle/engaged/offense modes, named and ranged weaponskills, Aftermath, wield/weapon-lock behavior, movement, buff overlays, elemental cases, Cure/Light bonus, Bard instrument handling, Geomancy handbell handling, and SELF-vs-other-player builder paths.
+
+## Known live verification gates
+
+The automated suite deliberately does not claim behavior that only a running Ashita/FFXI client can establish. Remaining live gates include:
+
+- actual callback/packet timing for success, interruption, cancellation, timeout, and server rejection;
+- real buffered equip timing across fast-cast, midcast, ranged, and return-to-default transitions;
+- LuAshitacast selection of duplicate augmented items from live wardrobes/bags;
+- actual `Enable`/`Disable` persistence and cancellation behavior in the client;
+- live resource/recast data across all real actions;
+- live buff enumeration, pet/status timing, and target naming supplied by Ashita/LuAshitacast;
+- job-file configuration and normal combat execution in a running client.
+
+These remain integration gates, not silent compatibility claims.
+
+## Upstream cleanliness
+
+The audit diff from `d973c5100be358215ab24574cfaf3469b839a71c` through the verified executable
+commit contains changes only under `ashita/` and `tests/`. No file under `RahvinGS/` or
+`Sample Job Files/` changed. No Class-C patch is required.
