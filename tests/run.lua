@@ -22,11 +22,12 @@ local suites = {
     settings = {'tests.ashita.test_settings'},
     commands = {'tests.parity.test_commands'},
     keybinds = {'tests.ashita.test_keybinds'},
+    display = {'tests.ashita.test_display'},
     parity_core = {'tests.parity.test_core_sets','tests.parity.test_merge_precedence'},
     upstream_load = {'tests.contract.test_upstream_load'},
     audit_contracts = {'tests.contract.test_gearswap_slots', 'tests.contract.test_windower_surface'},
 }
-suites.all = {'baseline', 'compat_sets', 'modes', 'include', 'phase1_primitives', 'snapshot', 'lac_data', 'equip_backend', 'action_runtime', 'bootstrap', 'state_runtime', 'phase2_audit', 'events', 'scheduler', 'packets', 'th_parity', 'ipc', 'spellreceived_parity', 'inventory', 'enchant_hoxne', 'settings', 'commands', 'keybinds', 'upstream_load', 'audit_contracts', 'parity_core'}
+suites.all = {'baseline', 'compat_sets', 'modes', 'include', 'phase1_primitives', 'snapshot', 'lac_data', 'equip_backend', 'action_runtime', 'bootstrap', 'state_runtime', 'phase2_audit', 'events', 'scheduler', 'packets', 'th_parity', 'ipc', 'spellreceived_parity', 'inventory', 'enchant_hoxne', 'settings', 'commands', 'keybinds', 'display', 'upstream_load', 'audit_contracts', 'parity_core'}
 local requested = arg[1] or 'all'
 local failures, passes = 0, 0
 local function run(name)
