@@ -33,6 +33,7 @@ end
 
 function methods:begin(action)
     if action == nil then error('RahvinCompatError:action.begin_nil', 2) end
+    if self.active and self.active.signature == signature(action) then return self.active.generation end
     if self.active then self:_finish(true) end
     self.generation = self.generation + 1
     self.active = {action=copy(action), signature=signature(action), generation=self.generation,
