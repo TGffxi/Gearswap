@@ -2,7 +2,12 @@ local a = require('tests.lib.assertions')
 local bootstrap = require('ashita.bootstrap')
 
 return function()
-    a.equal(type(require('ashita.profile')), 'function')
+    local entry=require('ashita.profile')
+    for _, name in ipairs({'OnLoad','OnUnload','HandleCommand','HandleDefault','HandleAbility','HandleItem',
+        'HandlePrecast','HandleMidcast','HandlePreshot','HandleMidshot','HandleWeaponskill'}) do
+        a.equal(type(entry[name]),'function','profile.'..name)
+    end
+    a.raises(function() entry.OnLoad() end,'RahvinCompatError:profile_not_configured')
     local log, current = {}, nil
     local target={Id=2,Index=3,Name='Target',Distance=4,Status='Idle'}
     local gData={GetAction=function() return current end, GetActionTarget=function() return target end}

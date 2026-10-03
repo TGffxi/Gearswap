@@ -1,8 +1,20 @@
 local bootstrap = require('ashita.bootstrap')
+local profile = {Sets={}}
+local delegate
 
--- The installation entry point supplies the live gData/gFunc objects and the selected
--- Rahvin engine environment. Keeping construction explicit also makes reload teardown
--- deterministic and permits the same profile contract to run in the LuaJIT harness.
-return function(deps)
-    return bootstrap.create(deps)
+function profile.Configure(deps)
+    delegate = bootstrap.create(deps)
+    profile.Sets = delegate.Sets
+    return profile
 end
+
+local callbacks = {'OnLoad','OnUnload','HandleCommand','HandleDefault','HandleAbility','HandleItem',
+    'HandlePrecast','HandleMidcast','HandlePreshot','HandleMidshot','HandleWeaponskill'}
+for _, name in ipairs(callbacks) do
+    profile[name] = function(...)
+        if not delegate then error('RahvinCompatError:profile_not_configured', 2) end
+        return delegate[name](...)
+    end
+end
+
+return profile
