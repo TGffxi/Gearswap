@@ -16,6 +16,7 @@ return function()
 
     local emitted = {}
     local ipc_listener
+    local cleared = 0
     local platform = {
         emit=function(_, name, ...)
             emitted[#emitted + 1] = {name=name, args={...}}
@@ -33,7 +34,7 @@ return function()
             ipc_listener = nil
             return true
         end,
-        clear_events=function() return true end,
+        clear_events=function() cleared=cleared+1; return true end,
     }
 
     local target_index = 40
@@ -106,5 +107,6 @@ return function()
         'Ashita logout must reach Rahvin display_logout registration before teardown')
 
     a.equal(service.unload(), true)
-    a.equal(platform._cleared, nil, 'test platform does not expose internal state')
+    a.equal(cleared, 1,
+        'profile unload must clear Windower-shaped handlers from the completed generation')
 end
