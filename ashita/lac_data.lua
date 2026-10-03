@@ -17,6 +17,15 @@ local resource_magic_types = {
 local ability_types = {['Quick Draw']='CorsairShot', ['Corsair Roll']='CorsairRoll',
     ['Blood Pact: Rage']='BloodPactRage', ['Blood Pact: Ward']='BloodPactWard',
     Ready='PetCommand'}
+-- Ashita v4 AbilityType values from the pinned SDK. These resource types retain the
+-- distinctions Rahvin/GearSwap uses even when LAC reports the high-level Type as Unknown.
+local resource_ability_types = {
+    [0]='JobAbility', [1]='JobAbility', [2]='PetCommand', [3]='WeaponSkill',
+    [6]='BloodPactRage', [8]='CorsairRoll', [9]='CorsairShot', [10]='BloodPactWard',
+    [11]='Samba', [12]='Waltz', [13]='Step', [14]='Flourish1', [15]='Scholar',
+    [16]='Jig', [17]='Flourish2', [18]='PetCommand', [19]='Flourish3',
+    [21]='Rune', [22]='Ward', [23]='Effusion',
+}
 local entity_types = {PC='PLAYER', Monster='MONSTER', NPC='NPC', Party='PLAYER', Alliance='PLAYER'}
 
 local function get(gData, name)
@@ -49,7 +58,11 @@ function M.action(gData)
     local rahvin_type = kind[2] or value.Type
     if value.ActionType == 'Spell' then
         rahvin_type = spell_types[value.Type] or (resource and resource_magic_types[resource.Type]) or value.Type
-    elseif value.ActionType == 'Ability' then rahvin_type = ability_types[value.Type] or 'JobAbility' end
+    elseif value.ActionType == 'Ability' then
+        rahvin_type = ability_types[value.Type]
+            or (resource and resource_ability_types[resource.Type])
+            or 'JobAbility'
+    end
     return {
         english=value.Name, name=value.Name, id=value.Id, action_type=kind[1],
         type=rahvin_type, skill=value.Skill, element=value.Element,
