@@ -12,10 +12,13 @@ return function()
     a.equal(set:contains('one'), true)
     a.equal(set.two, true)
 
-    -- Windower extends Lua's string library; unchanged Rahvin code relies on trim() in the
-    -- enchanted-item lookup path. Keep that compatibility surface explicit and regression-tested.
+    -- Windower extends Lua's string library. Unchanged Rahvin code relies on trim() in the
+    -- enchanted-item lookup path and lpad() in the debug display.
     a.equal(type(string.trim), 'function', 'Windower-compatible string.trim must exist')
     a.equal(('  Test Charm\t\r\n'):trim(), 'Test Charm', 'string.trim removes leading/trailing whitespace')
+    a.equal(type(string.lpad), 'function', 'Windower-compatible string.lpad must exist')
+    a.equal(('[true]'):lpad(' ', 12), '      [true]', 'string.lpad left-pads to the requested total width')
+    a.equal(('longer'):lpad('0', 3), 'longer', 'string.lpad never truncates a value already wider than the target')
 
     for _, name in ipairs({'config', 'resources', 'extdata', 'socket', 'files', 'xml'}) do
         a.equal(type(env.require(name)), 'table', name)
