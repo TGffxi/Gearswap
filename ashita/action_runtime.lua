@@ -63,5 +63,6 @@ end
 function methods:cancelled() return self:_finish(true) end
 function methods:interrupted() return self:_finish(true) end
 function methods:reset() return self:_finish(true) end
+function methods:is_active() return self.active ~= nil end
 
 return M
