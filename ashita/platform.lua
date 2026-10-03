@@ -19,6 +19,7 @@ function M.new(deps)
 
     local inventory = deps.inventory or require('ashita.inventory')
     local recasts = deps.recasts or require('ashita.recasts')
+    local native = deps.native
     local ipc_to_rahvin = deps.ipc_to_rahvin
     if ipc_to_rahvin == nil then
         ipc_to_rahvin = require('ashita.ipc').to_rahvin
@@ -40,6 +41,47 @@ function M.new(deps)
     local current_ipc
     local current_ipc_listener
     local service = {}
+
+    -- The production composition supplies one native Ashita/LAC facade.  Keep these
+    -- methods on the platform even in the pure-Lua harness so compatibility code has one
+    -- stable surface; if composition omitted a capability, fail at the call site instead
+    -- of silently pretending the Windower operation succeeded.
+    local native_methods = {
+        'chat', 'send_command', 'input', 'window_settings', 'wc_match', 'get_info',
+        'get_abilities', 'get_party', 'get_mob_by_id', 'get_mob_by_index', 'get_player',
+        'inject_outgoing', 'schedule', 'gettime', 'load_config', 'save_config',
+        'decode_item', 'new_file',
+    }
+    for _, name in ipairs(native_methods) do
+        local method_name = name
+        service[method_name] = function(_, ...)
+            local fn = require_method(native, method_name, 'native.' .. method_name)
+            return fn(...)
+        end
+    end
+
+    local primitive_methods = {
+        create='prim_create',
+        delete='prim_delete',
+        set_position='prim_set_position',
+        set_size='prim_set_size',
+        set_color='prim_set_color',
+        set_visibility='prim_set_visibility',
+    }
+    for native_name, platform_name in pairs(primitive_methods) do
+        local primitive_name = native_name
+        local method_name = platform_name
+        service[method_name] = function(_, ...)
+            local prim = native and native.prim
+            local fn = require_method(prim, primitive_name, 'native.prim.' .. primitive_name)
+            return fn(...)
+        end
+    end
+
+    -- Resource collections are intentionally shared by identity.  compat.resources wraps
+    -- the collections but must observe the exact same production snapshot as the rest of
+    -- the platform; copying here would let resource state drift between adapters.
+    service.resources = native and native.resources or nil
 
     function service:register_event(name, fn)
         if type(name) ~= 'string' or name == '' then
