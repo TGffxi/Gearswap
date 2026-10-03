@@ -1,0 +1,58 @@
+local M = {}
+
+local action_types = {
+    Spell={'Magic', nil}, Weaponskill={'WeaponSkill', 'WeaponSkill'},
+    Ability={'JobAbility', 'Job Ability'}, Ranged={'RangedAttack', 'Ranged Attack'},
+    Item={'Item', 'Item'},
+}
+
+local function get(gData, name)
+    local fn = gData and gData[name]
+    if type(fn) ~= 'function' then error('RahvinCompatError:gData.' .. name, 3) end
+    return fn()
+end
+
+local function entity(value)
+    if value == nil then return nil end
+    return {id=value.Id, index=value.Index, name=value.Name, distance=value.Distance,
+        status=value.Status, type=value.Type, hpp=value.HPP, tp=value.TP}
+end
+
+function M.action(gData)
+    local value = get(gData, 'GetAction')
+    if value == nil then return nil end
+    local kind = action_types[value.ActionType]
+    if not kind then error('RahvinCompatError:unknown_action_type:' .. tostring(value.ActionType), 2) end
+    local resource = value.Resource
+    local recast_id = resource and (resource.RecastTimerId or resource.RecastId) or nil
+    return {
+        english=value.Name, name=value.Name, id=value.Id, action_type=kind[1],
+        type=kind[2] or value.Type, skill=value.Skill, element=value.Element,
+        cast_time=value.CastTime, recast=value.Recast, recast_id=recast_id,
+        target=entity(get(gData, 'GetActionTarget')),
+    }
+end
+
+function M.target(gData) return entity(get(gData, 'GetTarget')) end
+function M.pet(gData) return entity(get(gData, 'GetPet')) end
+
+function M.player(gData)
+    local value = get(gData, 'GetPlayer')
+    if value == nil then return nil end
+    return {name=value.Name, main_job=value.MainJob, main_job_level=value.MainJobLevel,
+        main_job_sync=value.MainJobSync, sub_job=value.SubJob, sub_job_level=value.SubJobLevel,
+        sub_job_sync=value.SubJobSync, status=value.Status, hp=value.HP, max_hp=value.MaxHP,
+        hpp=value.HPP, mp=value.MP, max_mp=value.MaxMP, mpp=value.MPP, tp=value.TP,
+        is_moving=value.IsMoving}
+end
+
+function M.world(gData)
+    local value = get(gData, 'GetEnvironment')
+    if value == nil then return nil end
+    return {area=value.Area, day=value.Day, day_element=value.DayElement, weather=value.Weather,
+        weather_element=value.WeatherElement, raw_weather=value.RawWeather,
+        raw_weather_element=value.RawWeatherElement, time=value.Time, timestamp=value.Timestamp,
+        moon=value.MoonPhase, moon_pct=value.MoonPercent}
+end
+
+return M
