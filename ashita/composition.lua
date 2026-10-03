@@ -8,6 +8,7 @@ local bootstrap = require('ashita.bootstrap')
 local environment = require('compat.environment')
 local gearswap = require('compat.gearswap')
 local windower = require('compat.windower')
+local texts_compat = require('compat.texts')
 
 local M = {}
 
@@ -120,7 +121,7 @@ function M.new(deps)
     environment.install_runtime(env, platform)
     gearswap.install(env, backend)
     env.windower = windower.new(platform)
-    env.texts = deps.texts or env.texts
+    env.texts = deps.texts or texts_compat.new(need(deps.fonts, 'fonts'))
     env._global = env._global or {}
 
     local function capture_snapshot(data)
