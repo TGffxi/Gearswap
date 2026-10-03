@@ -63,6 +63,12 @@ function M.install_runtime(env, platform)
         if value == nil then error('RahvinCompatError:require:' .. tostring(name), 2) end
         return value
     end
+    -- GearSwap exposes send_command directly in the user-file environment as well as through
+    -- windower.send_command. Rahvin uses the global form for key binds and shutdown.
+    env.send_command = function(command)
+        if type(platform.send_command) ~= 'function' then error('RahvinCompatError:send_command', 2) end
+        return platform:send_command(command)
+    end
     local table_lib = {}; for key,value in pairs(table) do table_lib[key]=value end
     table_lib.copy = require('compat.sets').copy
     table_lib.contains = function(values, wanted) for _,value in pairs(values) do if value == wanted then return true end end return false end
