@@ -14,10 +14,9 @@ local function escape(value)
 end
 
 local function unescape(value)
-    local decoded = value:gsub('%%(%x%x)', function(hex)
+    return (value:gsub('%%(%x%x)', function(hex)
         return string.char(tonumber(hex, 16))
-    end)
-    return decoded
+    end))
 end
 
 local function split_wire(raw)
@@ -60,6 +59,7 @@ function M.decode(raw)
     if type(raw) ~= 'string' then return nil end
     local fields = split_wire(raw)
     if #fields ~= 8 or fields[1] ~= PREFIX then return nil end
+
     local version = tonumber(fields[2])
     if version ~= M.VERSION then return nil end
     local timestamp = tonumber(fields[8])
@@ -94,8 +94,13 @@ function M.from_rahvin(message, sender, timestamp)
         local at = tonumber(sent)
         if not at then return nil end
         return {
-            v=M.VERSION, sender=caster, kind=tag, phase='START', action=action,
-            target=target, timestamp=at,
+            v=M.VERSION,
+            sender=caster,
+            kind=tag,
+            phase='START',
+            action=action,
+            target=target,
+            timestamp=at,
         }
     end
 
@@ -104,24 +109,39 @@ function M.from_rahvin(message, sender, timestamp)
         local at = tonumber(complete_sent)
         if not at then return nil end
         return {
-            v=M.VERSION, sender=complete_caster, kind='CAST', phase='COMPLETE', action='',
-            target='', timestamp=at,
+            v=M.VERSION,
+            sender=complete_caster,
+            kind='CAST',
+            phase='COMPLETE',
+            action='',
+            target='',
+            timestamp=at,
         }
     end
 
     local asker = message:match('^RAHVIN|ROLLQ|([^|]+)$')
     if asker then
         return {
-            v=M.VERSION, sender=sender, kind='ROLLQ', phase='QUERY', action='',
-            target=asker, timestamp=timestamp,
+            v=M.VERSION,
+            sender=sender,
+            kind='ROLLQ',
+            phase='QUERY',
+            action='',
+            target=asker,
+            timestamp=timestamp,
         }
     end
 
     local to, buff, total = message:match('^RAHVIN|ROLL|([^|]+)|(%d+)|(%d+)$')
     if to then
         return {
-            v=M.VERSION, sender=sender, kind='ROLL', phase='STATE', action=buff .. ',' .. total,
-            target=to, timestamp=timestamp,
+            v=M.VERSION,
+            sender=sender,
+            kind='ROLL',
+            phase='STATE',
+            action=buff .. ',' .. total,
+            target=to,
+            timestamp=timestamp,
         }
     end
 
@@ -137,25 +157,30 @@ function M.to_rahvin(payload)
 
     if (kind == 'SPELL' or kind == 'ABILITY') and phase == 'START' and sender and timestamp then
         return ('RAHVIN|%s|%s|%s|%s|%s'):format(
-            kind, sender, tostring(payload.target or ''), tostring(payload.action or ''), tostring(timestamp))
+            kind,
+            sender,
+            tostring(payload.target or ''),
+            tostring(payload.action or ''),
+            tostring(timestamp))
     end
+
     if kind == 'CAST' and phase == 'COMPLETE' and sender and timestamp then
         return ('RAHVIN|COMPLETE|%s|%s'):format(sender, tostring(timestamp))
     end
+
     if kind == 'ROLLQ' and payload.target then
         return 'RAHVIN|ROLLQ|' .. tostring(payload.target)
     end
+
     if kind == 'ROLL' and payload.target then
         local buff, total = tostring(payload.action or ''):match('^(%d+),(%d+)$')
         if buff then
             return ('RAHVIN|ROLL|%s|%s|%s'):format(tostring(payload.target), buff, total)
         end
     end
+
     return nil
 end
-
-local Service = {}
-Service.__index = Service
 
 local function copy_payload(payload)
     return {
@@ -170,98 +195,105 @@ local function copy_payload(payload)
 end
 
 function M.new(transport, options)
-    if type(transport) ~= 'table' or type(transport.send) ~= 'function' or type(transport.subscribe) ~= 'function' then
+    if type(transport) ~= 'table'
+        or type(transport.send) ~= 'function'
+        or type(transport.subscribe) ~= 'function' then
         error('RahvinCompatError:ipc.transport', 2)
     end
+
     options = options or {}
-    local self = setmetatable({
-        transport=transport,
-        clock=options.clock or function() return os.clock() * 1000 end,
-        max_age=tonumber(options.max_age) or 5000,
-        sender=options.sender,
-        subscribers={},
-        seen={},
-        closed=false,
-    }, Service)
+    local clock = options.clock or function() return os.clock() * 1000 end
+    local max_age = tonumber(options.max_age) or 5000
+    local sender = options.sender
+    local subscribers = {}
+    local seen = {}
+    local closed = false
+    local service = {}
 
-    self._on_raw = function(raw) self:_receive(raw) end
-    transport.subscribe(self._on_raw)
-    return self
-end
-
-function Service:_purge_seen(now)
-    local cutoff = now - self.max_age
-    for raw, at in pairs(self.seen) do
-        if at < cutoff then self.seen[raw] = nil end
+    local function purge_seen(now)
+        local cutoff = now - max_age
+        for raw, at in pairs(seen) do
+            if at < cutoff then seen[raw] = nil end
+        end
     end
-end
 
-function Service:_receive(raw)
-    if self.closed then return false end
-    local message = M.decode(raw)
-    if not message then return false end
-    local now = tonumber(self.clock()) or 0
-    if message.timestamp < (now - self.max_age) then return false end
-    self:_purge_seen(now)
-    if self.seen[raw] then return false end
-    self.seen[raw] = now
+    local function receive(raw)
+        if closed then return false end
+        local message = M.decode(raw)
+        if not message then return false end
 
-    local snapshot = {}
-    for fn in pairs(self.subscribers) do snapshot[#snapshot + 1] = fn end
-    for i=1,#snapshot do snapshot[i](copy_payload(message)) end
-    return true
-end
+        local now = tonumber(clock()) or 0
+        if message.timestamp < (now - max_age) then return false end
+        purge_seen(now)
+        if seen[raw] then return false end
+        seen[raw] = now
 
-function Service:send(payload)
-    if self.closed then return false end
-    if type(payload) ~= 'table' then return false end
-    local message = copy_payload(payload)
-    message.v = message.v or M.VERSION
-    message.sender = message.sender or self.sender
-    message.timestamp = message.timestamp or self.clock()
-    local raw = M.encode(message)
-    if not raw then return false end
-    return self.transport.send(raw) ~= false
-end
-
-function Service:send_rahvin(message, sender, timestamp)
-    local payload = M.from_rahvin(message, sender or self.sender, timestamp or self.clock())
-    if not payload then return false end
-    return self:send(payload)
-end
-
-function Service:subscribe(fn)
-    if type(fn) ~= 'function' then error('RahvinCompatError:ipc.subscriber', 2) end
-    self.subscribers[fn] = true
-    return true
-end
-
-function Service:unsubscribe(fn)
-    self.subscribers[fn] = nil
-    return true
-end
-
-function Service:poll()
-    if self.closed then return 0 end
-    if type(self.transport.poll) == 'function' then return self.transport.poll() end
-    return 0
-end
-
-function Service:close()
-    if self.closed then return true end
-    self.closed = true
-    if type(self.transport.unsubscribe) == 'function' then
-        self.transport.unsubscribe(self._on_raw)
+        local snapshot = {}
+        for fn in pairs(subscribers) do snapshot[#snapshot + 1] = fn end
+        for i=1,#snapshot do
+            local ok = pcall(snapshot[i], copy_payload(message))
+            if not ok then
+                -- One subscriber must never prevent another Ashita client consumer from
+                -- seeing the same packet. Error reporting is deliberately left to the
+                -- subscriber/event layer that owns the callback.
+            end
+        end
+        return true
     end
-    if type(self.transport.close) == 'function' then self.transport.close() end
-    self.subscribers = {}
-    self.seen = {}
-    return true
+
+    local on_raw = receive
+    transport.subscribe(on_raw)
+
+    function service.send(payload)
+        if closed or type(payload) ~= 'table' then return false end
+        local message = copy_payload(payload)
+        message.v = message.v or M.VERSION
+        message.sender = message.sender or sender
+        message.timestamp = message.timestamp or clock()
+        local raw = M.encode(message)
+        if not raw then return false end
+        return transport.send(raw) ~= false
+    end
+
+    function service.send_rahvin(message, message_sender, timestamp)
+        local payload = M.from_rahvin(message, message_sender or sender, timestamp or clock())
+        if not payload then return false end
+        return service.send(payload)
+    end
+
+    function service.subscribe(fn)
+        if type(fn) ~= 'function' then error('RahvinCompatError:ipc.subscriber', 2) end
+        subscribers[fn] = true
+        return true
+    end
+
+    function service.unsubscribe(fn)
+        subscribers[fn] = nil
+        return true
+    end
+
+    function service.poll()
+        if closed then return 0 end
+        if type(transport.poll) == 'function' then return transport.poll() end
+        return 0
+    end
+
+    function service.close()
+        if closed then return true end
+        closed = true
+        if type(transport.unsubscribe) == 'function' then transport.unsubscribe(on_raw) end
+        if type(transport.close) == 'function' then transport.close() end
+        subscribers = {}
+        seen = {}
+        return true
+    end
+
+    return service
 end
 
--- First-party same-machine transport. It uses UDP multicast with TTL 0, so packets never
--- leave the host. Every Ashita instance joins the same group/port and polls it from its
--- frame callback; no daemon or external process is required.
+-- First-party same-machine transport. UDP multicast is confined to this host by TTL 0.
+-- Every Ashita instance joins the same group/port and polls it from an Ashita frame event;
+-- no daemon, Termux process or external helper is required.
 function M.localhost_transport(options)
     options = options or {}
     local ok, socket = pcall(require, 'socket')
@@ -273,15 +305,16 @@ function M.localhost_transport(options)
     local port = tonumber(options.port) or M.DEFAULT_PORT
     local interface = options.interface or '127.0.0.1'
     local udp = assert(socket.udp())
+
     pcall(function() udp:setoption('reuseaddr', true) end)
     assert(udp:setsockname('*', port))
     udp:settimeout(0)
+
     local joined = udp:setoption('ip-add-membership', {multiaddr=group, interface=interface})
     if joined == nil then
-        -- Some LuaSocket/Windows combinations require the default interface for loopback
-        -- multicast membership; TTL 0 still confines traffic to the local host.
         assert(udp:setoption('ip-add-membership', {multiaddr=group, interface='0.0.0.0'}))
     end
+
     pcall(function() udp:setoption('ip-multicast-ttl', 0) end)
     pcall(function() udp:setoption('ip-multicast-loop', true) end)
 
@@ -318,7 +351,9 @@ function M.localhost_transport(options)
 
     function transport.close()
         listeners = {}
-        pcall(function() udp:setoption('ip-drop-membership', {multiaddr=group, interface=interface}) end)
+        pcall(function()
+            udp:setoption('ip-drop-membership', {multiaddr=group, interface=interface})
+        end)
         udp:close()
         return true
     end
