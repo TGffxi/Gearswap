@@ -27,7 +27,10 @@ return function()
     a.deep_equal(events[7], {'pet','Carbuncle',true})
     r:update(snapshot('Resting', {}, nil)); a.deep_equal(events[8], {'pet','Carbuncle',false})
     r:update(snapshot('Resting', {}, nil)); a.equal(#events,8)
-    busy=true; r:update(snapshot('Engaged', {{id=4,name='March'}})); a.equal(#events,8)
+
+    -- Rahvin status changes are not gated by the action busy window. Buff redress is.
+    busy=true; r:update(snapshot('Engaged', {{id=4,name='March'}})); a.equal(#events,9)
+    a.deep_equal(events[9], {'status','Engaged','Resting'})
     busy=false; r:update(snapshot('Engaged', {{id=4,name='March'}})); a.equal(#events,10)
-    a.deep_equal(events[9], {'status','Engaged','Resting'}); a.deep_equal(events[10], {'buff','March',true})
+    a.deep_equal(events[10], {'buff','March',true})
 end
