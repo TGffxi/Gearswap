@@ -6,10 +6,11 @@ local suites = {
     phase1_primitives = {'tests.compat.test_phase1_primitives'},
     snapshot = {'tests.ashita.test_snapshot'},
     lac_data = {'tests.ashita.test_lac_data'},
+    equip_backend = {'tests.ashita.test_equip_backend'},
     upstream_load = {'tests.contract.test_upstream_load'},
     audit_contracts = {'tests.contract.test_gearswap_slots', 'tests.contract.test_windower_surface'},
 }
-suites.all = {'baseline', 'compat_sets', 'modes', 'include', 'phase1_primitives', 'snapshot', 'lac_data', 'upstream_load', 'audit_contracts'}
+suites.all = {'baseline', 'compat_sets', 'modes', 'include', 'phase1_primitives', 'snapshot', 'lac_data', 'equip_backend', 'upstream_load', 'audit_contracts'}
 local requested = arg[1] or 'all'
 local failures, passes = 0, 0
 local function run(name)
