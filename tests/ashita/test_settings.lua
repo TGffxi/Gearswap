@@ -1,6 +1,7 @@
 local a = require('tests.lib.assertions')
 
-local function memory_fs()
+local function memory_fs(options)
+    options = options or {}
     local files = {}
     local dirs = {}
     local ops = {}
@@ -28,6 +29,10 @@ local function memory_fs()
 
     function fs.rename(from, to)
         if files[from] == nil then return false end
+        if options.rename_refuses_existing and files[to] ~= nil then
+            ops[#ops + 1] = {'rename_refused_existing', from, to}
+            return false
+        end
         files[to] = files[from]
         files[from] = nil
         ops[#ops + 1] = {'rename', from, to}
@@ -120,6 +125,28 @@ return function()
     end
     a.equal(saw_temp_write, true, 'save must write a temporary file first')
     a.equal(saw_atomic_rename, true, 'save must atomically replace settings via rename')
+
+    -- Windows/Ashita may refuse rename(temp, final) while final already exists. Repeated
+    -- saves must still replace the character settings without deleting the only good copy
+    -- before the new file has been written.
+    local windows_fs = memory_fs({rename_refuses_existing=true})
+    local windows_store = settings.new(windows_fs, 'C:\\Ashita\\config\\addons\\luashitacast')
+    local first_windows = {visible=true, Display_Style='classic', Keybinds={offensemode='f12'}}
+    local second_windows = {visible=false, Display_Style='halo', Keybinds={offensemode='^f12'}}
+    a.equal(windows_store.save(alice, first_windows), true,
+        'first Windows-style settings save must succeed')
+    a.equal(windows_store.save(alice, second_windows), true,
+        'repeated save must succeed when rename refuses an existing target')
+    a.deep_equal(windows_store.load(alice, {}), second_windows,
+        'repeated Windows-style save must expose only the replacement settings')
+
+    local windows_path = windows_store.path(alice)
+    for path in pairs(windows_fs._files) do
+        a.equal(path:find(windows_path .. '.tmp.', 1, true) == nil, true,
+            'successful replacement must not leave a temp settings file')
+        a.equal(path:find(windows_path .. '.bak.', 1, true) == nil, true,
+            'successful replacement must not leave a backup settings file')
+    end
 
     local corrupt_path = store.path(bob)
     fs._files[corrupt_path] = 'this is not valid lua settings data'
