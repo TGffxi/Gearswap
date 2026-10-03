@@ -11,7 +11,7 @@ local suites = {
     bootstrap = {'tests.ashita.test_bootstrap'},
     state_runtime = {'tests.ashita.test_state_runtime'},
     phase2_audit = {'tests.ashita.test_phase2_audit_contracts'},
-    parity_core = {'tests.parity.test_core_sets'},
+    parity_core = {'tests.parity.test_core_sets','tests.parity.test_merge_precedence'},
     upstream_load = {'tests.contract.test_upstream_load'},
     audit_contracts = {'tests.contract.test_gearswap_slots', 'tests.contract.test_windower_surface'},
 }
