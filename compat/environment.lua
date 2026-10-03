@@ -70,6 +70,9 @@ function M.install_runtime(env, platform)
     string.contains = string.contains or function(value, needle) return value:find(needle, 1, true) ~= nil end
     string.startswith = string.startswith or function(value, prefix) return value:sub(1, #prefix) == prefix end
     string.endswith = string.endswith or function(value, suffix) return suffix == '' or value:sub(-#suffix) == suffix end
+    string.trim = string.trim or function(value)
+        return (tostring(value):gsub('^%s*(.-)%s*$', '%1'))
+    end
     env.coroutine = {}; for key,value in pairs(coroutine) do env.coroutine[key]=value end
     env.coroutine.schedule = function(fn, delay)
         if type(platform.schedule) ~= 'function' then error('RahvinCompatError:schedule', 2) end
