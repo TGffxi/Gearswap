@@ -10,7 +10,11 @@ return function()
     a.raises(function() entry.OnLoad() end,'RahvinCompatError:profile_not_configured')
     local log, current = {}, nil
     local target={Id=2,Index=3,Name='Target',Distance=4,Status='Idle',Type='Monster'}
-    local gData={GetAction=function() return current end, GetActionTarget=function() return target end}
+    local gData={
+        GetAction=function() return current end,
+        GetActionTarget=function() return target end,
+        GetPlayer=function() return {Name='Tester'} end,
+    }
     local gFunc={EquipSet=function() end,Enable=function() end,Disable=function() end,CancelAction=function() end}
     local engine={}
     for _, name in ipairs({'load','unload','command','default','pretarget','precast','midcast','preshot','midshot','aftercast'}) do
