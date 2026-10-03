@@ -20,6 +20,7 @@ local suites = {
     ipc = {'tests.ashita.test_ipc'},
     ipc_clock = {'tests.ashita.test_ipc_clock'},
     platform = {'tests.ashita.test_platform'},
+    platform_windower = {'tests.ashita.test_platform_windower_surface'},
     runtime_events = {'tests.ashita.test_runtime_events', 'tests.ashita.test_platform_event_isolation'},
     lifecycle_runtime_events = {'tests.ashita.test_lifecycle_runtime_events'},
     spellreceived_parity = {'tests.parity.test_spellreceived'},
@@ -35,7 +36,7 @@ local suites = {
     upstream_load = {'tests.contract.test_upstream_load'},
     audit_contracts = {'tests.contract.test_gearswap_slots', 'tests.contract.test_windower_surface'},
 }
-suites.all = {'baseline', 'compat_sets', 'modes', 'include', 'phase1_primitives', 'snapshot', 'lac_data', 'equip_backend', 'action_runtime', 'bootstrap', 'state_runtime', 'phase2_audit', 'events', 'scheduler', 'scheduler_lifecycle', 'packets', 'packet_decoder', 'th_parity', 'ipc', 'ipc_clock', 'platform', 'runtime_events', 'lifecycle_runtime_events', 'spellreceived_parity', 'inventory', 'enchant_hoxne', 'settings', 'commands', 'keybinds', 'display', 'lifecycle', 'runtime_integration', 'upstream_load', 'audit_contracts', 'parity_core'}
+suites.all = {'baseline', 'compat_sets', 'modes', 'include', 'phase1_primitives', 'snapshot', 'lac_data', 'equip_backend', 'action_runtime', 'bootstrap', 'state_runtime', 'phase2_audit', 'events', 'scheduler', 'scheduler_lifecycle', 'packets', 'packet_decoder', 'th_parity', 'ipc', 'ipc_clock', 'platform', 'platform_windower', 'runtime_events', 'lifecycle_runtime_events', 'spellreceived_parity', 'inventory', 'enchant_hoxne', 'settings', 'commands', 'keybinds', 'display', 'lifecycle', 'runtime_integration', 'upstream_load', 'audit_contracts', 'parity_core'}
 local requested = arg[1] or 'all'
 local failures, passes = 0, 0
 local function run(name)
