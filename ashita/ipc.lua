@@ -194,6 +194,14 @@ local function copy_payload(payload)
     }
 end
 
+local function wall_clock_ms()
+    local ok, socket = pcall(require, 'socket')
+    if not ok or type(socket) ~= 'table' or type(socket.gettime) ~= 'function' then
+        error('RahvinCompatError:ipc.clock', 2)
+    end
+    return socket.gettime() * 1000
+end
+
 function M.new(transport, options)
     if type(transport) ~= 'table'
         or type(transport.send) ~= 'function'
@@ -202,7 +210,7 @@ function M.new(transport, options)
     end
 
     options = options or {}
-    local clock = options.clock or function() return os.clock() * 1000 end
+    local clock = options.clock or wall_clock_ms
     local max_age = tonumber(options.max_age) or 5000
     local sender = options.sender
     local subscribers = {}
