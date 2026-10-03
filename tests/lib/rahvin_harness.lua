@@ -24,7 +24,8 @@ local function text_box(cfg)
     end})
 end
 
-local function make_platform()
+local function make_platform(opts)
+    opts = opts or {}
     local events, scheduled = {}, {}
     local platform = {
         resources={elements={}, items={}, buffs={}, job_abilities={}, weapon_skills={}, spells={}, zones={}, bags={}, jobs={}},
@@ -45,7 +46,10 @@ local function make_platform()
         get_player=function() return {id=1,index=1,name='Tester'} end,
         window_settings=function() return {ui_x_res=1920,ui_y_res=1080} end,
         inject_outgoing=function() end,
-        load_config=function(_,_,defaults) return defaults end,
+        load_config=function(_,_,defaults)
+            for key, value in pairs(opts.settings or {}) do defaults[key] = value end
+            return defaults
+        end,
         save_config=function() end,
         decode_item=function() return {} end,
         new_file=function(_, path)
@@ -62,7 +66,7 @@ end
 
 function M.new(opts)
     opts=opts or {}
-    local platform=make_platform()
+    local platform=make_platform(opts)
     local env=environment.new(platform)
     env.player={
         name='Tester', main_job=opts.job or 'WAR', sub_job=opts.sub_job or 'SAM',
@@ -91,6 +95,18 @@ function M.new(opts)
     env.include('RahvinGS/Rahvin-Engine')
 
     return setmetatable({env=env, platform=platform, equipped=equipped}, methods)
+end
+
+function methods:event(name, occurrence)
+    occurrence = occurrence or 1
+    local seen = 0
+    for _, entry in ipairs(self.platform._events) do
+        if entry.name == name then
+            seen = seen + 1
+            if seen == occurrence then return entry.fn end
+        end
+    end
+    return nil
 end
 
 function methods:set_offense(options, value)
