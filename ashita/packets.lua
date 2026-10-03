@@ -1,3 +1,4 @@
+local packet_decoder = require('ashita.packet_decoder')
 local M = {}
 
 -- Packet ids are pinned against Ashita v4 / LuAshitacast sources used by this port.
@@ -19,7 +20,7 @@ end
 
 function M.new(handlers, decoder)
     handlers = handlers or {}
-    decoder = decoder or {}
+    decoder = decoder or packet_decoder.new()
 
     local zone_change = require_handler(handlers, 'zone_change')
     local incoming_chunk = require_handler(handlers, 'incoming_chunk')
