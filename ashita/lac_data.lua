@@ -37,7 +37,15 @@ function M.action(gData)
     local kind = action_types[value.ActionType]
     if not kind then error('RahvinCompatError:unknown_action_type:' .. tostring(value.ActionType), 2) end
     local resource = value.Resource
-    local recast_id = resource and (resource.RecastTimerId or resource.RecastId) or nil
+    local recast_id
+    if value.ActionType == 'Spell' then
+        -- Windower resources intentionally use the spell id as recast_id; SE changed the
+        -- in-memory spell recast table to be indexed by spell id rather than a separate
+        -- recast timer id. Ashita ISpell has no RecastTimerId field.
+        recast_id = (resource and (resource.Id or resource.Index)) or value.Id
+    elseif value.ActionType == 'Ability' or value.ActionType == 'Weaponskill' then
+        recast_id = resource and resource.RecastTimerId or nil
+    end
     local rahvin_type = kind[2] or value.Type
     if value.ActionType == 'Spell' then
         rahvin_type = spell_types[value.Type] or (resource and resource_magic_types[resource.Type]) or value.Type
