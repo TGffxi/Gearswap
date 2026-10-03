@@ -58,11 +58,11 @@ function M.new(clock, on_error)
     return service
 end
 
--- The lifecycle service owns the single Ashita d3d_present registration and calls tick().
--- Keeping the scheduler itself event-agnostic prevents duplicate frame handlers and allows
--- unregister_all() followed by a fresh lifecycle load to rebind cleanly.
 local default_service = M.new(os.clock, default_error)
 
+-- Frame ownership belongs to ashita.lifecycle. Keeping the scheduler passive prevents
+-- duplicate d3d_present handlers and allows logout/reload to tear every runtime event
+-- down through one registry before the next profile generation binds a fresh frame.
 function M.schedule(fn, delay)
     return default_service.schedule(fn, delay)
 end
