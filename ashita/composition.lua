@@ -1,0 +1,251 @@
+local platform_module = require('ashita.platform')
+local runtime_events_module = require('ashita.runtime_events')
+local lifecycle_module = require('ashita.lifecycle')
+local action_runtime_module = require('ashita.action_runtime')
+local state_runtime_module = require('ashita.state_runtime')
+local equip_backend_module = require('ashita.equip_backend')
+local bootstrap = require('ashita.bootstrap')
+local environment = require('compat.environment')
+local gearswap = require('compat.gearswap')
+local windower = require('compat.windower')
+
+local M = {}
+
+local STARTUP = {
+    {'discover_buff_children', 1.9},
+    {'roll_query', 1.9},
+    {'display_box_update', 2.0},
+    {'dual_wield_check', 2.1},
+    {'two_hand_check', 2.2},
+    {'bridge_weapon_lock', 2.2},
+    {'resolve_weapon_lock', 2.2},
+    {'unlock', 2.3},
+    {'main_engine', 2.4},
+    {'migration_notice', 2.5},
+    {'settings_reset_announce', 2.6},
+}
+
+local unpack_values = unpack or table.unpack
+
+local function need(value, label)
+    if value == nil then error('RahvinCompatError:composition.' .. label, 3) end
+    return value
+end
+
+local function need_method(owner, name, label)
+    local fn = owner and owner[name]
+    if type(fn) ~= 'function' then
+        error('RahvinCompatError:composition.' .. (label or name), 3)
+    end
+    return fn
+end
+
+local function normalize_path(path)
+    return tostring(path or ''):gsub('\\', '/'):gsub('%.lua$', '')
+end
+
+local function invoke_env(env, name, ...)
+    local fn = env[name]
+    if type(fn) ~= 'function' then
+        error('RahvinCompatError:engine.' .. name, 3)
+    end
+    return fn(...)
+end
+
+local function seed_environment(env, snapshot)
+    if type(snapshot) ~= 'table' then return end
+    if snapshot.player ~= nil then env.player = snapshot.player end
+    if snapshot.world ~= nil then env.world = snapshot.world end
+    if snapshot.buffactive ~= nil then env.buffactive = snapshot.buffactive end
+    if snapshot.pet ~= nil then env.pet = snapshot.pet end
+
+    if type(env.player) == 'table' then
+        if snapshot.equipment ~= nil and env.player.equipment == nil then
+            env.player.equipment = snapshot.equipment
+        end
+        if snapshot.inventory ~= nil and env.player.inventory == nil then
+            env.player.inventory = snapshot.inventory
+        end
+    end
+end
+
+function M.new(deps)
+    deps = deps or {}
+
+    local scheduler = need(deps.scheduler, 'scheduler')
+    need_method(scheduler, 'schedule', 'scheduler.schedule')
+    need_method(scheduler, 'tick', 'scheduler.tick')
+    need_method(scheduler, 'clear', 'scheduler.clear')
+
+    local events = need(deps.events, 'events')
+    local native = need(deps.native, 'native')
+    local gData = need(deps.gData, 'gData')
+    local gFunc = need(deps.gFunc, 'gFunc')
+    local snapshot_source = need(deps.snapshot, 'snapshot')
+    if type(snapshot_source) ~= 'function' then
+        error('RahvinCompatError:composition.snapshot', 2)
+    end
+
+    local startup_capture = {}
+    local capturing_startup = false
+
+    -- Never give Windower coroutine.schedule an independent queue.  During the unchanged
+    -- Rahvin engine root load, capture only its eleven deferred startup registrations.
+    -- As soon as that include returns, all subsequent scheduling goes to the exact scheduler
+    -- instance lifecycle ticks.
+    local native_facade = setmetatable({
+        schedule=function(fn, delay)
+            if type(fn) ~= 'function' then
+                error('RahvinCompatError:composition.schedule_callback', 2)
+            end
+            if capturing_startup then
+                local entry = {fn=fn, delay=delay}
+                startup_capture[#startup_capture + 1] = entry
+                return entry
+            end
+            return scheduler.schedule(fn, delay)
+        end,
+    }, {__index=native})
+
+    local platform = platform_module.new({
+        native=native_facade,
+        inventory=deps.inventory,
+        recasts=deps.recasts,
+        ipc_to_rahvin=deps.ipc_to_rahvin,
+        on_event_error=deps.on_event_error,
+    })
+
+    local backend = equip_backend_module.new(gFunc)
+    local env = environment.new(platform)
+    environment.install_runtime(env, platform)
+    gearswap.install(env, backend)
+    env.windower = windower.new(platform)
+    env.texts = deps.texts or env.texts
+    env._global = env._global or {}
+
+    local function capture_snapshot(data)
+        local value = snapshot_source(data)
+        seed_environment(env, value)
+        return value
+    end
+
+    seed_environment(env, capture_snapshot(gData))
+
+    -- Capture only the unchanged Rahvin root's startup schedules, not arbitrary job-file
+    -- schedules.  Nested component includes inherit the capture flag until the root returns.
+    local base_include = env.include
+    env.include = function(path)
+        if normalize_path(path) ~= 'RahvinGS/Rahvin-Engine' then
+            return base_include(path)
+        end
+
+        local previous = capturing_startup
+        capturing_startup = true
+        local results = {pcall(base_include, path)}
+        capturing_startup = previous
+        if not results[1] then error(results[2], 2) end
+        table.remove(results, 1)
+        return unpack_values(results)
+    end
+
+    local job_path = need(deps.job_path, 'job_path')
+    env.include(job_path)
+
+    if #startup_capture ~= #STARTUP then
+        error(('RahvinCompatError:composition.startup_count:%d'):format(#startup_capture), 2)
+    end
+
+    local startup = {}
+    for index, spec in ipairs(STARTUP) do
+        local captured = startup_capture[index]
+        if captured.delay ~= spec[2] then
+            error(('RahvinCompatError:composition.startup_delay:%s:%s')
+                :format(spec[1], tostring(captured.delay)), 2)
+        end
+        startup[spec[1]] = captured.fn
+    end
+
+    -- The adapter deliberately resolves Rahvin globals at call time.  Job files may replace
+    -- custom hooks after the engine root has loaded, so copying function values here would
+    -- freeze stale references.
+    local engine = {}
+
+    engine.load = function()
+        return invoke_env(env, 'get_sets')
+    end
+
+    engine.unload = function()
+        return invoke_env(env, 'file_unload')
+    end
+
+    engine.command = function(args)
+        if type(args) == 'table' then args = table.concat(args, ' ') end
+        return invoke_env(env, 'self_command', args)
+    end
+
+    engine.default = function()
+        local status = env.player and env.player.status or nil
+        return invoke_env(env, 'status_change', status, status)
+    end
+
+    engine.pretarget = function(action) return invoke_env(env, 'pretarget', action) end
+    engine.precast = function(action) return invoke_env(env, 'precast', action) end
+    engine.midcast = function(action) return invoke_env(env, 'midcast', action) end
+    engine.preshot = function(action) return invoke_env(env, 'precast', action) end
+    engine.midshot = function(action) return invoke_env(env, 'midcast', action) end
+    engine.aftercast = function(action) return invoke_env(env, 'aftercast', action) end
+    engine.status_change = function(...) return invoke_env(env, 'status_change', ...) end
+    engine.buff_change = function(...) return invoke_env(env, 'buff_change', ...) end
+    engine.pet_change = function(...) return invoke_env(env, 'pet_change', ...) end
+    engine.is_busy = function() return env.is_Busy == true end
+
+    local action_runtime = action_runtime_module.new(engine, deps.clock)
+    local state_runtime = state_runtime_module.new(engine)
+
+    local runtime_events = runtime_events_module.new({
+        events=events,
+        platform=platform,
+        decoder=deps.decoder,
+    })
+
+    local lifecycle = lifecycle_module.new({
+        events=events,
+        scheduler=scheduler,
+        ipc_factory=need(deps.ipc_factory, 'ipc_factory'),
+        display=need(deps.display, 'display'),
+        keybinds=need(deps.keybinds, 'keybinds'),
+        commands=need(deps.commands, 'commands'),
+        action_runtime=action_runtime,
+        runtime_events=runtime_events,
+        release_slots=need(deps.release_slots, 'release_slots'),
+        reset_special=need(deps.reset_special, 'reset_special'),
+        startup=startup,
+    })
+
+    local profile = bootstrap.create({
+        gData=gData,
+        gFunc=gFunc,
+        backend=backend,
+        engine=engine,
+        action_runtime=action_runtime,
+        state_runtime=state_runtime,
+        lifecycle=lifecycle,
+        settings=deps.settings or {},
+        sets=env.sets,
+        snapshot=capture_snapshot,
+    })
+
+    return {
+        profile=profile,
+        platform=platform,
+        env=env,
+        engine=engine,
+        lifecycle=lifecycle,
+        runtime_events=runtime_events,
+        action_runtime=action_runtime,
+        state_runtime=state_runtime,
+        backend=backend,
+    }
+end
+
+return M
