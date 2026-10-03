@@ -17,7 +17,8 @@ return function()
     local emitted = {}
     local ipc_listener
     local cleared = 0
-    local platform = {
+    local platform
+    platform = {
         emit=function(_, name, ...)
             emitted[#emitted + 1] = {name=name, args={...}}
             return 1
