@@ -19,7 +19,7 @@ end
 return function()
     local cases = {
         {{ActionType='Spell', Name='Fire', Id=144, Type='Black Magic', Skill='Elemental Magic', Element='Fire',
-            CastTime=2000, Recast=8000, Resource={RecastTimerId=12}}, 'Magic', 'BlackMagic'},
+            CastTime=2000, Recast=8000, Resource={RecastTimerId=12,Element=0}}, 'Magic', 'BlackMagic'},
         {{ActionType='Weaponskill', Name='Savage Blade', Id=42}, 'Ability', 'WeaponSkill'},
         {{ActionType='Ability', Name='Provoke', Id=5, Type='Unknown', Resource={RecastTimerId=1}}, 'Ability', 'JobAbility'},
         {{ActionType='Ranged', Name='Ranged', Id=0}, 'Ranged Attack', 'Ranged Attack'},
@@ -33,13 +33,14 @@ return function()
         a.equal(got.target.distance, 4.5); a.equal(got.target.status, 'Engaged')
     end
     local spell = lac_data.action(provider(cases[1][1]))
-    a.equal(spell.element, 'Fire'); a.equal(spell.skill, 'Elemental Magic'); a.equal(spell.recast_id, 12)
+    a.equal(spell.element, 'Fire'); a.equal(spell.element_id, 0); a.equal(spell.skill, 'Elemental Magic'); a.equal(spell.recast_id, 12)
     a.equal(lac_data.action(provider({ActionType='Ability',Name='Light Shot',Id=1,Type='Quick Draw'})).type,'CorsairShot')
     a.equal(lac_data.action(provider({ActionType='Spell',Name='Cure',Id=1,Type='White Magic'})).type,'WhiteMagic')
     a.equal(lac_data.action(provider(nil)), nil)
     local p = lac_data.player(provider()); a.equal(p.name, 'Tester'); a.equal(p.main_job, 'WAR'); a.equal(p.is_moving, true)
     local pet = lac_data.pet(provider()); a.equal(pet.id, 44); a.equal(pet.name, 'Pet')
     local world = lac_data.world(provider()); a.equal(world.day, 'Firesday'); a.equal(world.weather, 'Fire x2')
-    a.equal(world.day_element, 'Fire'); a.equal(world.weather_element, 'Fire')
+    a.equal(world.day_element, 'Fire'); a.equal(world.weather_element, 'Fire'); a.equal(world.weather_intensity, 2)
     local target = lac_data.target(provider()); a.equal(target.id, 99); a.equal(target.index, 7)
+    a.equal(target.type, 'MONSTER')
 end
