@@ -6,8 +6,15 @@ local function unsupported(name)
     return function() error('RahvinCompatError:' .. name, 2) end
 end
 function M.new(platform)
+    local function wrapped_table(value)
+        value = value or {}
+        local methods = {
+            contains=function(self, wanted) for _, item in pairs(self) do if item == wanted then return true end end return false end,
+        }
+        return setmetatable(value, {__index=methods})
+    end
     local env = {
-        sets={}, set_combine=sets_compat.combine, M=modes.M,
+        sets={}, set_combine=sets_compat.combine, M=modes.M, S=wrapped_table, T=wrapped_table,
         equip=unsupported('equip'), enable=unsupported('enable'), disable=unsupported('disable'),
         cancel_spell=unsupported('cancel_spell'),
         _platform=platform or {},
@@ -26,5 +33,35 @@ function M.install_globals(env)
         for key, old in pairs(previous) do rawset(_G, key, old.exists and old.value or nil) end
     end
     return handle
+end
+function M.install_runtime(env, platform)
+    local resources = require('compat.resources').new(platform)
+    local modules = {
+        config=require('compat.config').new(platform), resources=resources,
+        extdata=require('compat.extdata').new(platform),
+        socket={gettime=function() return platform.gettime and platform:gettime() or os.time() end},
+        files={new=function(path)
+            return {exists=function() return false end, read=function() return nil end, path=path}
+        end},
+        xml={parse=function() error('RahvinCompatError:xml.parse', 2) end},
+    }
+    env.require = function(name)
+        local value = modules[name]
+        if value == nil then error('RahvinCompatError:require:' .. tostring(name), 2) end
+        return value
+    end
+    local table_lib = {}; for key,value in pairs(table) do table_lib[key]=value end
+    table_lib.copy = require('compat.sets').copy
+    table_lib.contains = function(values, wanted) for _,value in pairs(values) do if value == wanted then return true end end return false end
+    env.table = table_lib
+    string.contains = string.contains or function(value, needle) return value:find(needle, 1, true) ~= nil end
+    string.startswith = string.startswith or function(value, prefix) return value:sub(1, #prefix) == prefix end
+    string.endswith = string.endswith or function(value, suffix) return suffix == '' or value:sub(-#suffix) == suffix end
+    env.coroutine = {}; for key,value in pairs(coroutine) do env.coroutine[key]=value end
+    env.coroutine.schedule = function(fn, delay)
+        if type(platform.schedule) ~= 'function' then error('RahvinCompatError:schedule', 2) end
+        return platform:schedule(fn, delay)
+    end
+    return env
 end
 return M

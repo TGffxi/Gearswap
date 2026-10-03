@@ -16,8 +16,8 @@ local function run(name)
         if suites[entry] then run(entry) else
             package.loaded[entry] = nil
             local loaded, test = pcall(require, entry)
-            local ok, err = loaded and pcall(test) or false, loaded and nil or test
-            if loaded and not ok then err = test end
+            local ok, err
+            if loaded then ok, err = pcall(test) else ok, err = false, test end
             if ok then passes = passes + 1; io.write('PASS ', entry, '\n')
             else failures = failures + 1; io.stderr:write('FAIL ', entry, ': ', tostring(err), '\n') end
         end

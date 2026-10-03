@@ -6,7 +6,9 @@ local function locate(self, value)
 end
 function methods:options(...)
     if self._boolean then error('RahvinCompatError:mode_boolean_options', 2) end
+    for i = 1, #self._options do self[i] = nil end
     self._options = {...}
+    for i, option in ipairs(self._options) do self[i] = option end
     if #self._options == 0 then error('RahvinCompatError:mode_empty_options', 2) end
     self._index, self.value = 1, self._options[1]
     return self
@@ -39,8 +41,13 @@ function methods:reset()
     elseif #self._options > 0 then self._index, self.value = 1, self._options[1] end
     return self.value
 end
-function M.M(spec)
+function M.M(spec, ...)
     if type(spec) == 'boolean' then return setmetatable({_boolean=true, _default=spec, value=spec, _options={false,true}}, mt) end
+    if type(spec) == 'string' then
+        local object = setmetatable({_options={}, _index=0}, mt)
+        object:options(spec, ...)
+        return object
+    end
     spec = spec or {}
     if type(spec) ~= 'table' then error('RahvinCompatError:mode_constructor', 2) end
     return setmetatable({description=spec.description, _options={}, _index=0}, mt)
