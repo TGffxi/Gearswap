@@ -29,10 +29,17 @@ function methods:_busy()
     return type(fn)=='function' and fn() == true
 end
 
+-- Rahvin intentionally does not blanket-gate state hooks while an action is busy.
+-- Status and pet transitions must reach their hooks immediately. Buff-driven redress is
+-- the one transition family that is deferred by this adapter while the engine is busy.
 function methods:_emit(name, ...)
-    local event={name=name,args={...}}
+    return call(self.engine,name,...)
+end
+
+function methods:_emit_buff(...)
+    local event={name='buff_change',args={...}}
     if self:_busy() then self.pending[#self.pending+1]=event
-    else call(self.engine,name,unpack(event.args)) end
+    else call(self.engine,event.name,unpack(event.args)) end
 end
 
 function methods:_flush()
@@ -56,7 +63,7 @@ function methods:update(snapshot)
     table.sort(ordered,function(a,b) return tostring(a)<tostring(b) end)
     for _,id in ipairs(ordered) do
         local before=(old.buffs[id] or 0)>0; local after=(current.buffs[id] or 0)>0
-        if before~=after then self:_emit('buff_change',current.names[id] or old.names[id] or tostring(id),after) end
+        if before~=after then self:_emit_buff(current.names[id] or old.names[id] or tostring(id),after) end
     end
     local old_id=old.pet and (old.pet.id or old.pet.index); local new_id=current.pet and (current.pet.id or current.pet.index)
     if old_id~=new_id then
