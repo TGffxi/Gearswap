@@ -13,6 +13,10 @@ function methods:options(...)
     self._index, self.value = 1, self._options[1]
     return self
 end
+function methods:contains(value)
+    if self._boolean then return self.value == value end
+    return locate(self, value) ~= nil
+end
 function methods:cycle()
     if self._boolean then self.value = not self.value; return self.value end
     if #self._options == 0 then error('RahvinCompatError:mode_no_options', 2) end

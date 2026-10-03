@@ -3,7 +3,7 @@ local source = debug.getinfo(1, 'S').source:sub(2)
 local root = source:match('^(.*)[/\\]compat[/\\]include%.lua$') or '.'
 local aliases = {Modes='compat/modes.lua'}
 local function normalize(path)
-    if type(path) ~= 'string' or path == '' or path:find('%.%.', 1, true) or path:match('^[/\\]') then
+    if type(path) ~= 'string' or path == '' or path:find('..', 1, true) or path:match('^[/\\]') then
         error('RahvinCompatError:invalid_include:' .. tostring(path), 3)
     end
     path = path:gsub('\\', '/'):gsub('%.lua$', '')

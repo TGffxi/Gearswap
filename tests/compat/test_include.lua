@@ -9,6 +9,8 @@ return function()
     local modes = include.load('Modes', env)
     a.equal(type(modes), 'table')
     a.raises(function() include.load('does/not/exist', env) end, 'RahvinCompatError:include_not_found:does/not/exist')
+    a.raises(function() include.load('../RahvinGS/interface', env) end, 'RahvinCompatError:invalid_include')
+    a.raises(function() include.load('tests/../RahvinGS/interface', env) end, 'RahvinCompatError:invalid_include')
     local old = package.path
     package.path = '/tmp/host-shadow/?.lua;' .. old
     local ok, err = pcall(include.load, 'does/not/exist', env)
