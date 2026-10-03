@@ -15,6 +15,7 @@ return function()
         get_player=function() return {id=1,index=1} end, window_settings=function() return {ui_x_res=1920,ui_y_res=1080} end,
         inject_outgoing=function() end, load_config=function(_,_,defaults) return defaults end, save_config=function() end,
         decode_item=function() return {} end,
+        new_file=function(_, path) return {path=path, exists=function() return false end, read=function() return nil end} end,
     }
     for _, op in ipairs({'create','delete','set_position','set_size','set_color','set_visibility'}) do platform['prim_'..op]=function() end end
     local env = environment.new(platform)

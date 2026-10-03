@@ -20,4 +20,5 @@ return function()
     end
     a.raises(function() w.ffxi.get_party() end, 'RahvinCompatError:windower.get_party')
     a.raises(function() w.ffxi.get_spell_recasts() end, 'RahvinCompatError:windower.get_spell_recasts')
+    a.raises(function() w.wc_match('value', '*') end, 'RahvinCompatError:windower.wc_match')
 end

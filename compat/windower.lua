@@ -12,11 +12,12 @@ function M.new(platform)
         add_to_chat=required(platform, 'chat'), send_command=required(platform, 'send_command'),
         send_ipc_message=required(platform, 'send_ipc'), register_event=required(platform, 'register_event'),
         raw_register_event=required(platform, 'register_event'), get_windower_settings=required(platform, 'window_settings'),
-        wc_match=function(value, pattern) return tostring(value):match(pattern) ~= nil end,
+        wc_match=required(platform, 'wc_match'),
         chat={input=required(platform, 'input')},
         ffxi={
             get_info=required(platform, 'get_info'), get_items=required(platform, 'get_items'),
             get_abilities=required(platform, 'get_abilities'), get_ability_recasts=required(platform, 'get_ability_recasts'),
+            get_spell_recasts=required(platform, 'get_spell_recasts'), get_party=required(platform, 'get_party'),
             get_mob_by_id=required(platform, 'get_mob_by_id'), get_mob_by_index=required(platform, 'get_mob_by_index'),
             get_player=required(platform, 'get_player'),
         },

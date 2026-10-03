@@ -6,15 +6,27 @@ local function unsupported(name)
     return function() error('RahvinCompatError:' .. name, 2) end
 end
 function M.new(platform)
+    local table_methods = {
+        contains=function(self, wanted) for _, item in ipairs(self) do if item == wanted then return true end end return false end,
+        insert=function(self, ...) table.insert(self, ...); return self end,
+        concat=function(self, ...) return table.concat(self, ...) end,
+        clear=function(self) for key in pairs(self) do self[key] = nil end; return self end,
+    }
     local function wrapped_table(value)
+        return setmetatable(value or {}, {__index=table_methods})
+    end
+    local function wrapped_set(value)
         value = value or {}
-        local methods = {
-            contains=function(self, wanted) for _, item in pairs(self) do if item == wanted then return true end end return false end,
-        }
-        return setmetatable(value, {__index=methods})
+        local membership = {}
+        for _, item in ipairs(value) do membership[item] = true end
+        return setmetatable(value, {__index=function(_, key)
+            local method = table_methods[key]
+            if method ~= nil then return method end
+            return membership[key]
+        end})
     end
     local env = {
-        sets={}, set_combine=sets_compat.combine, M=modes.M, S=wrapped_table, T=wrapped_table,
+        sets={}, set_combine=sets_compat.combine, M=modes.M, S=wrapped_set, T=wrapped_table,
         equip=unsupported('equip'), enable=unsupported('enable'), disable=unsupported('disable'),
         cancel_spell=unsupported('cancel_spell'),
         _platform=platform or {},
@@ -41,7 +53,8 @@ function M.install_runtime(env, platform)
         extdata=require('compat.extdata').new(platform),
         socket={gettime=function() return platform.gettime and platform:gettime() or os.time() end},
         files={new=function(path)
-            return {exists=function() return false end, read=function() return nil end, path=path}
+            if type(platform.new_file) ~= 'function' then error('RahvinCompatError:files.new', 2) end
+            return platform:new_file(path)
         end},
         xml={parse=function() error('RahvinCompatError:xml.parse', 2) end},
     }

@@ -20,5 +20,8 @@ return function()
         Ear1='left_ear', Ear2='right_ear', Ring1='left_ring', Ring2='right_ring',
     }
     for lac, spelling in pairs(canonical) do a.equal(slots.to_gearswap(lac), spelling, lac) end
+    for spelling, lac in pairs(accepted) do
+        a.equal(slots.to_gearswap(spelling), canonical[lac], 'reverse ' .. spelling)
+    end
     a.raises(function() slots.to_lac('cape') end, 'RahvinCompatError:unknown_slot:cape')
 end

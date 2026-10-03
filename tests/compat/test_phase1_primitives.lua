@@ -18,4 +18,5 @@ return function()
         {'socket','gettime'}, {'files','new'}, {'xml','parse'}}) do
         a.equal(type(env.require(contract[1])[contract[2]]), 'function', table.concat(contract, '.'))
     end
+    a.raises(function() env.require('files').new('data/settings.xml') end, 'RahvinCompatError:files.new')
 end

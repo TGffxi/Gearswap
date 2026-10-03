@@ -48,12 +48,12 @@ end
 function M.M(spec, ...)
     if type(spec) == 'boolean' then return setmetatable({_boolean=true, _default=spec, value=spec, _options={false,true}}, mt) end
     if type(spec) == 'string' then
-        local object = setmetatable({_options={}, _index=0}, mt)
+        local object = setmetatable({_options={}, _index=0, _track={_type='list'}}, mt)
         object:options(spec, ...)
         return object
     end
     spec = spec or {}
     if type(spec) ~= 'table' then error('RahvinCompatError:mode_constructor', 2) end
-    return setmetatable({description=spec.description, _options={}, _index=0}, mt)
+    return setmetatable({description=spec.description, _options={}, _index=0, _track={_type='list'}}, mt)
 end
 return M
