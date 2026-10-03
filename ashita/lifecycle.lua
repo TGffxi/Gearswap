@@ -33,6 +33,7 @@ function M.new(deps)
     local keybinds = deps.keybinds
     local commands = deps.commands
     local action_runtime = deps.action_runtime
+    local runtime_events = deps.runtime_events
     local startup = deps.startup or {}
 
     local event_register = require_method(events, 'register', 'events.register')
@@ -47,6 +48,21 @@ function M.new(deps)
     local commands_register = require_method(commands, 'register', 'commands.register')
     local commands_unregister = require_method(commands, 'unregister', 'commands.unregister')
     local action_reset = require_method(action_runtime, 'reset', 'action_runtime.reset')
+
+    local runtime_register
+    local runtime_attach_ipc
+    local runtime_detach_ipc
+    local runtime_frame
+    local runtime_logout
+    local runtime_unload
+    if runtime_events ~= nil then
+        runtime_register = require_method(runtime_events, 'register', 'runtime_events.register')
+        runtime_attach_ipc = require_method(runtime_events, 'attach_ipc', 'runtime_events.attach_ipc')
+        runtime_detach_ipc = require_method(runtime_events, 'detach_ipc', 'runtime_events.detach_ipc')
+        runtime_frame = require_method(runtime_events, 'frame', 'runtime_events.frame')
+        runtime_logout = require_method(runtime_events, 'logout', 'runtime_events.logout')
+        runtime_unload = require_method(runtime_events, 'unload', 'runtime_events.unload')
+    end
 
     if type(deps.ipc_factory) ~= 'function' then
         error('RahvinCompatError:lifecycle.ipc_factory', 2)
@@ -73,11 +89,16 @@ function M.new(deps)
         if not running then return false end
         scheduler_tick()
         if ipc and type(ipc.poll) == 'function' then ipc.poll() end
+        if runtime_frame then runtime_frame() end
         return true
     end
 
     local function stop(reason)
         if not running then return true end
+
+        -- Rahvin's own logout handler must run while its Windower-shaped event surface is
+        -- still alive. Profile unload is not a logout and clears that surface below instead.
+        if reason == 'logout' and runtime_logout then runtime_logout() end
 
         -- Stop every producer before releasing input, visuals and held equipment.
         scheduler_clear()
@@ -85,6 +106,7 @@ function M.new(deps)
         deps.reset_special(reason)
         keybind_clear()
         display_hide()
+        if runtime_detach_ipc then runtime_detach_ipc() end
         if ipc and type(ipc.close) == 'function' then ipc.close() end
         ipc = nil
         commands_unregister()
@@ -105,6 +127,10 @@ function M.new(deps)
             error('RahvinCompatError:lifecycle.ipc_service', 2)
         end
 
+        if runtime_register then
+            runtime_register()
+            runtime_attach_ipc(ipc)
+        end
         commands_register()
         keybind_apply(settings)
         event_register('d3d_present', 'rahvings_runtime_tick', frame_tick)
@@ -128,6 +154,7 @@ function M.new(deps)
     function service.unload()
         if destroyed then return true end
         if running then stop('unload') end
+        if runtime_unload then runtime_unload() end
         display_destroy()
         destroyed = true
         return true
