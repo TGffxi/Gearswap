@@ -2,7 +2,14 @@ local a = require('tests.lib.assertions')
 local environment = require('compat.environment')
 
 return function()
-    local env = environment.install_runtime(environment.new(), {})
+    local sent = {}
+    local platform = {
+        send_command=function(_, command)
+            sent[#sent + 1] = command
+            return true
+        end,
+    }
+    local env = environment.install_runtime(environment.new(), platform)
     local list = env.T{'one'}
     list:insert('two')
     a.equal(list:concat('|'), 'one|two')
@@ -19,6 +26,12 @@ return function()
     a.equal(type(string.lpad), 'function', 'Windower-compatible string.lpad must exist')
     a.equal(('[true]'):lpad(' ', 12), '      [true]', 'string.lpad left-pads to the requested total width')
     a.equal(('longer'):lpad('0', 3), 'longer', 'string.lpad never truncates a value already wider than the target')
+
+    -- GearSwap exposes send_command as a user-file global in addition to windower.send_command.
+    -- Rahvin's keybind and shutdown handlers use that global directly.
+    a.equal(type(env.send_command), 'function', 'GearSwap-compatible global send_command must exist')
+    a.equal(env.send_command('bind f8 gs c OffenseMode'), true)
+    a.equal(sent[1], 'bind f8 gs c OffenseMode', 'global send_command delegates to the platform command backend')
 
     for _, name in ipairs({'config', 'resources', 'extdata', 'socket', 'files', 'xml'}) do
         a.equal(type(env.require(name)), 'table', name)
