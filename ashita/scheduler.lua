@@ -58,22 +58,12 @@ function M.new(clock, on_error)
     return service
 end
 
+-- The lifecycle service owns the single Ashita d3d_present registration and calls tick().
+-- Keeping the scheduler itself event-agnostic prevents duplicate frame handlers and allows
+-- unregister_all() followed by a fresh lifecycle load to rebind cleanly.
 local default_service = M.new(os.clock, default_error)
-local frame_bound = false
-
-local function ensure_frame_binding()
-    if frame_bound then return end
-    local root = rawget(_G, 'ashita')
-    if not (root and type(root.events) == 'table') then return end
-    local events = require('ashita.events')
-    events.register('d3d_present', 'rahvings_scheduler_tick', function()
-        default_service.tick(os.clock())
-    end)
-    frame_bound = true
-end
 
 function M.schedule(fn, delay)
-    ensure_frame_binding()
     return default_service.schedule(fn, delay)
 end
 
