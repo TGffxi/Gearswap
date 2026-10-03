@@ -15,11 +15,13 @@ local suites = {
     scheduler = {'tests.ashita.test_scheduler'},
     packets = {'tests.ashita.test_packets'},
     th_parity = {'tests.parity.test_th'},
+    ipc = {'tests.ashita.test_ipc'},
+    spellreceived_parity = {'tests.parity.test_spellreceived'},
     parity_core = {'tests.parity.test_core_sets','tests.parity.test_merge_precedence'},
     upstream_load = {'tests.contract.test_upstream_load'},
     audit_contracts = {'tests.contract.test_gearswap_slots', 'tests.contract.test_windower_surface'},
 }
-suites.all = {'baseline', 'compat_sets', 'modes', 'include', 'phase1_primitives', 'snapshot', 'lac_data', 'equip_backend', 'action_runtime', 'bootstrap', 'state_runtime', 'phase2_audit', 'events', 'scheduler', 'packets', 'th_parity', 'upstream_load', 'audit_contracts', 'parity_core'}
+suites.all = {'baseline', 'compat_sets', 'modes', 'include', 'phase1_primitives', 'snapshot', 'lac_data', 'equip_backend', 'action_runtime', 'bootstrap', 'state_runtime', 'phase2_audit', 'events', 'scheduler', 'packets', 'th_parity', 'ipc', 'spellreceived_parity', 'upstream_load', 'audit_contracts', 'parity_core'}
 local requested = arg[1] or 'all'
 local failures, passes = 0, 0
 local function run(name)
