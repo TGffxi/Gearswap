@@ -7,6 +7,13 @@ local action_types = {
 }
 local spell_types = {['White Magic']='WhiteMagic', ['Black Magic']='BlackMagic',
     Summoning='SummonerPact', ['Bard Song']='BardSong', ['Blue Magic']='BlueMagic'}
+-- Ashita v4 MagicType values from the pinned SDK. LAC can surface Type='Unknown'
+-- while still exposing the underlying ISpell resource, so recover the GearSwap/Rahvin
+-- family from the real resource instead of inventing LAC fields or spell-name rules.
+local resource_magic_types = {
+    [1]='WhiteMagic', [2]='BlackMagic', [3]='SummonerPact', [4]='Ninjutsu',
+    [5]='BardSong', [6]='BlueMagic', [7]='Geomancy', [8]='Trust',
+}
 local ability_types = {['Quick Draw']='CorsairShot', ['Corsair Roll']='CorsairRoll',
     ['Blood Pact: Rage']='BloodPactRage', ['Blood Pact: Ward']='BloodPactWard',
     Ready='PetCommand'}
@@ -32,7 +39,8 @@ function M.action(gData)
     local resource = value.Resource
     local recast_id = resource and (resource.RecastTimerId or resource.RecastId) or nil
     local rahvin_type = kind[2] or value.Type
-    if value.ActionType == 'Spell' then rahvin_type = spell_types[value.Type] or value.Type
+    if value.ActionType == 'Spell' then
+        rahvin_type = spell_types[value.Type] or (resource and resource_magic_types[resource.Type]) or value.Type
     elseif value.ActionType == 'Ability' then rahvin_type = ability_types[value.Type] or 'JobAbility' end
     return {
         english=value.Name, name=value.Name, id=value.Id, action_type=kind[1],
