@@ -14,13 +14,9 @@ local function escape(value)
 end
 
 local function unescape(value)
-    local ok = true
     local decoded = value:gsub('%%(%x%x)', function(hex)
-        local n = tonumber(hex, 16)
-        if not n then ok = false; return '' end
-        return string.char(n)
+        return string.char(tonumber(hex, 16))
     end)
-    if not ok then return nil end
     return decoded
 end
 
@@ -74,9 +70,7 @@ function M.decode(raw)
     local phase = unescape(fields[5])
     local action = unescape(fields[6])
     local target = unescape(fields[7])
-    if not sender or sender == '' or not kind or kind == '' or not phase or phase == '' or not action or not target then
-        return nil
-    end
+    if sender == '' or kind == '' or phase == '' then return nil end
 
     return {
         v=version,
@@ -94,13 +88,13 @@ function M.from_rahvin(message, sender, timestamp)
     sender = tostring(sender or '')
     timestamp = tonumber(timestamp) or 0
 
-    local kind, caster, target, action, sent =
-        message:match('^RAHVIN|(SPELL|ABILITY)|([^|]+)|([^|]*)|([^|]+)|([^|]+)$')
-    if kind then
+    local tag, caster, target, action, sent =
+        message:match('^RAHVIN|([^|]+)|([^|]+)|([^|]*)|([^|]+)|([^|]+)$')
+    if tag == 'SPELL' or tag == 'ABILITY' then
         local at = tonumber(sent)
         if not at then return nil end
         return {
-            v=M.VERSION, sender=caster, kind=kind, phase='START', action=action,
+            v=M.VERSION, sender=caster, kind=tag, phase='START', action=action,
             target=target, timestamp=at,
         }
     end
