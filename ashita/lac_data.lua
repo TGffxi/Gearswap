@@ -27,6 +27,7 @@ local resource_ability_types = {
     [21]='Rune', [22]='Ward', [23]='Effusion',
 }
 local entity_types = {PC='PLAYER', Monster='MONSTER', NPC='NPC', Party='PLAYER', Alliance='PLAYER'}
+local player_entity_types = {PC=true, Party=true, Alliance=true}
 
 local function get(gData, name)
     local fn = gData and gData[name]
@@ -34,10 +35,18 @@ local function get(gData, name)
     return fn()
 end
 
-local function entity(value)
+local function entity(value, player_name)
     if value == nil then return nil end
+    local target_type = entity_types[value.Type] or value.Type
+    -- Pinned LAC GetPlayer exposes the player's name while GetActionTarget/GetTarget expose
+    -- entity Name + spawn classification but not a shared player id/index.  For a player-like
+    -- target, matching the local player's name is therefore the strongest available identity
+    -- signal and restores GearSwap's SELF category without inventing unsupported fields.
+    if player_name ~= nil and value.Name == player_name and player_entity_types[value.Type] then
+        target_type = 'SELF'
+    end
     return {id=value.Id, index=value.Index, name=value.Name, distance=value.Distance,
-        status=value.Status, type=entity_types[value.Type] or value.Type, hpp=value.HPP, tp=value.TP}
+        status=value.Status, type=target_type, hpp=value.HPP, tp=value.TP}
 end
 
 function M.action(gData)
@@ -63,16 +72,21 @@ function M.action(gData)
             or (resource and resource_ability_types[resource.Type])
             or 'JobAbility'
     end
+    local player = get(gData, 'GetPlayer')
     return {
         english=value.Name, name=value.Name, id=value.Id, action_type=kind[1],
         type=rahvin_type, skill=value.Skill, element=value.Element,
         element_id=resource and resource.Element or nil,
         cast_time=value.CastTime, recast=value.Recast, recast_id=recast_id,
-        target=entity(get(gData, 'GetActionTarget')),
+        target=entity(get(gData, 'GetActionTarget'), player and player.Name or nil),
+        resend=value.Resend == true,
     }
 end
 
-function M.target(gData) return entity(get(gData, 'GetTarget')) end
+function M.target(gData)
+    local player = get(gData, 'GetPlayer')
+    return entity(get(gData, 'GetTarget'), player and player.Name or nil)
+end
 function M.pet(gData) return entity(get(gData, 'GetPet')) end
 
 function M.player(gData)
