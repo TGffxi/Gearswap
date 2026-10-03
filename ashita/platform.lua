@@ -8,6 +8,12 @@ local function require_method(owner, name, label)
     return fn
 end
 
+local function default_event_error(name, err)
+    if type(print) == 'function' then
+        print('RahvinCompatError:event_handler:' .. tostring(name) .. ':' .. tostring(err))
+    end
+end
+
 function M.new(deps)
     deps = deps or {}
 
@@ -19,6 +25,11 @@ function M.new(deps)
     end
     if type(ipc_to_rahvin) ~= 'function' then
         error('RahvinCompatError:platform.ipc_to_rahvin', 2)
+    end
+
+    local on_event_error = deps.on_event_error or default_event_error
+    if type(on_event_error) ~= 'function' then
+        error('RahvinCompatError:platform.on_event_error', 2)
     end
 
     local iter_bag = require_method(inventory, 'iter_bag', 'inventory.iter_bag')
@@ -51,7 +62,14 @@ function M.new(deps)
         if not list then return 0 end
         local snapshot = {}
         for i = 1, #list do snapshot[i] = list[i] end
-        for i = 1, #snapshot do snapshot[i](...) end
+        local args = {...}
+        local unpack_args = unpack or table.unpack
+        for i = 1, #snapshot do
+            local ok, err = pcall(snapshot[i], unpack_args(args))
+            if not ok then
+                pcall(on_event_error, name, err)
+            end
+        end
         return #snapshot
     end
 
