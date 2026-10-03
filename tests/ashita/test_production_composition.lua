@@ -157,6 +157,11 @@ return function()
         end,
     }
 
+    local previous_fonts_preload = package.preload['fonts']
+    local previous_fonts_loaded = package.loaded['fonts']
+    package.loaded['fonts'] = nil
+    package.preload['fonts'] = function() return fonts end
+
     local display_hides, display_destroys = 0, 0
     local display = {
         hide=function() display_hides = display_hides + 1; return true end,
@@ -185,7 +190,6 @@ return function()
         ipc_to_rahvin=function(payload) return payload and payload.message or nil end,
         gData=gData,
         gFunc=gFunc,
-        fonts=fonts,
         snapshot=snapshot,
         job_path='tests/fixtures/production_job',
         settings=settings,
@@ -273,6 +277,9 @@ return function()
     local file = files.new('probe.txt')
     a.equal(file.path, 'probe.txt')
     a.equal(native_calls[#native_calls].name, 'new_file', 'files compatibility must resolve through platform')
+
+    package.preload['fonts'] = previous_fonts_preload
+    package.loaded['fonts'] = previous_fonts_loaded
 
     graph.profile.OnUnload()
     a.equal(graph.env.production_fixture_unloads, 1, 'LAC OnUnload must invoke Rahvin file_unload exactly once')
