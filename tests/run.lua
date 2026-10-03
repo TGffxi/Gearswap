@@ -13,6 +13,7 @@ local suites = {
     phase2_audit = {'tests.ashita.test_phase2_audit_contracts'},
     events = {'tests.ashita.test_events'},
     scheduler = {'tests.ashita.test_scheduler'},
+    scheduler_lifecycle = {'tests.ashita.test_scheduler_lifecycle'},
     packets = {'tests.ashita.test_packets'},
     th_parity = {'tests.parity.test_th'},
     ipc = {'tests.ashita.test_ipc'},
@@ -30,7 +31,7 @@ local suites = {
     upstream_load = {'tests.contract.test_upstream_load'},
     audit_contracts = {'tests.contract.test_gearswap_slots', 'tests.contract.test_windower_surface'},
 }
-suites.all = {'baseline', 'compat_sets', 'modes', 'include', 'phase1_primitives', 'snapshot', 'lac_data', 'equip_backend', 'action_runtime', 'bootstrap', 'state_runtime', 'phase2_audit', 'events', 'scheduler', 'packets', 'th_parity', 'ipc', 'ipc_clock', 'spellreceived_parity', 'inventory', 'enchant_hoxne', 'settings', 'commands', 'keybinds', 'display', 'lifecycle', 'runtime_integration', 'upstream_load', 'audit_contracts', 'parity_core'}
+suites.all = {'baseline', 'compat_sets', 'modes', 'include', 'phase1_primitives', 'snapshot', 'lac_data', 'equip_backend', 'action_runtime', 'bootstrap', 'state_runtime', 'phase2_audit', 'events', 'scheduler', 'scheduler_lifecycle', 'packets', 'th_parity', 'ipc', 'ipc_clock', 'spellreceived_parity', 'inventory', 'enchant_hoxne', 'settings', 'commands', 'keybinds', 'display', 'lifecycle', 'runtime_integration', 'upstream_load', 'audit_contracts', 'parity_core'}
 local requested = arg[1] or 'all'
 local failures, passes = 0, 0
 local function run(name)
