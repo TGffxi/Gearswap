@@ -121,7 +121,13 @@ function M.new(deps)
     environment.install_runtime(env, platform)
     gearswap.install(env, backend)
     env.windower = windower.new(platform)
-    env.texts = deps.texts or texts_compat.new(need(deps.fonts, 'fonts'))
+    local fonts = deps.fonts
+    if fonts == nil then
+        local ok, loaded = pcall(require, 'fonts')
+        if not ok then error('RahvinCompatError:composition.fonts:' .. tostring(loaded), 2) end
+        fonts = loaded
+    end
+    env.texts = deps.texts or texts_compat.new(fonts)
     env._global = env._global or {}
 
     local function capture_snapshot(data)
