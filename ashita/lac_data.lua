@@ -1,10 +1,15 @@
 local M = {}
 
 local action_types = {
-    Spell={'Magic', nil}, Weaponskill={'WeaponSkill', 'WeaponSkill'},
-    Ability={'JobAbility', 'Job Ability'}, Ranged={'RangedAttack', 'Ranged Attack'},
+    Spell={'Magic', nil}, Weaponskill={'Ability', 'WeaponSkill'},
+    Ability={'Ability', nil}, Ranged={'Ranged Attack', 'Ranged Attack'},
     Item={'Item', 'Item'},
 }
+local spell_types = {['White Magic']='WhiteMagic', ['Black Magic']='BlackMagic',
+    Summoning='SummonerPact', ['Bard Song']='BardSong', ['Blue Magic']='BlueMagic'}
+local ability_types = {['Quick Draw']='CorsairShot', ['Corsair Roll']='CorsairRoll',
+    ['Blood Pact: Rage']='BloodPactRage', ['Blood Pact: Ward']='BloodPactWard',
+    Ready='PetCommand'}
 
 local function get(gData, name)
     local fn = gData and gData[name]
@@ -25,9 +30,12 @@ function M.action(gData)
     if not kind then error('RahvinCompatError:unknown_action_type:' .. tostring(value.ActionType), 2) end
     local resource = value.Resource
     local recast_id = resource and (resource.RecastTimerId or resource.RecastId) or nil
+    local rahvin_type = kind[2] or value.Type
+    if value.ActionType == 'Spell' then rahvin_type = spell_types[value.Type] or value.Type
+    elseif value.ActionType == 'Ability' then rahvin_type = ability_types[value.Type] or 'JobAbility' end
     return {
         english=value.Name, name=value.Name, id=value.Id, action_type=kind[1],
-        type=kind[2] or value.Type, skill=value.Skill, element=value.Element,
+        type=rahvin_type, skill=value.Skill, element=value.Element,
         cast_time=value.CastTime, recast=value.Recast, recast_id=recast_id,
         target=entity(get(gData, 'GetActionTarget')),
     }

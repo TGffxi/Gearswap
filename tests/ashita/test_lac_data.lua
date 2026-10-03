@@ -19,10 +19,10 @@ end
 return function()
     local cases = {
         {{ActionType='Spell', Name='Fire', Id=144, Type='Black Magic', Skill='Elemental Magic', Element='Fire',
-            CastTime=2000, Recast=8000, Resource={RecastTimerId=12}}, 'Magic', 'Black Magic'},
-        {{ActionType='Weaponskill', Name='Savage Blade', Id=42}, 'WeaponSkill', 'WeaponSkill'},
-        {{ActionType='Ability', Name='Provoke', Id=5, Type='Job Ability', Resource={RecastTimerId=1}}, 'JobAbility', 'Job Ability'},
-        {{ActionType='Ranged', Name='Ranged', Id=0}, 'RangedAttack', 'Ranged Attack'},
+            CastTime=2000, Recast=8000, Resource={RecastTimerId=12}}, 'Magic', 'BlackMagic'},
+        {{ActionType='Weaponskill', Name='Savage Blade', Id=42}, 'Ability', 'WeaponSkill'},
+        {{ActionType='Ability', Name='Provoke', Id=5, Type='Unknown', Resource={RecastTimerId=1}}, 'Ability', 'JobAbility'},
+        {{ActionType='Ranged', Name='Ranged', Id=0}, 'Ranged Attack', 'Ranged Attack'},
         {{ActionType='Item', Name='Echo Drops', Id=100, CastTime=1000, Recast=0}, 'Item', 'Item'},
     }
     for _, case in ipairs(cases) do
@@ -34,6 +34,8 @@ return function()
     end
     local spell = lac_data.action(provider(cases[1][1]))
     a.equal(spell.element, 'Fire'); a.equal(spell.skill, 'Elemental Magic'); a.equal(spell.recast_id, 12)
+    a.equal(lac_data.action(provider({ActionType='Ability',Name='Light Shot',Id=1,Type='Quick Draw'})).type,'CorsairShot')
+    a.equal(lac_data.action(provider({ActionType='Spell',Name='Cure',Id=1,Type='White Magic'})).type,'WhiteMagic')
     a.equal(lac_data.action(provider(nil)), nil)
     local p = lac_data.player(provider()); a.equal(p.name, 'Tester'); a.equal(p.main_job, 'WAR'); a.equal(p.is_moving, true)
     local pet = lac_data.pet(provider()); a.equal(pet.id, 44); a.equal(pet.name, 'Pet')

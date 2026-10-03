@@ -19,7 +19,7 @@ return function()
     r:tick(spell); r:tick(nil); a.equal(calls[4].name, 'aftercast'); a.equal(calls[4].action.interrupted, false)
     r:tick(nil); r:tick(nil); a.equal(#calls, 4)
 
-    calls = {}; local ranged=action('RangedAttack', 2)
+    calls = {}; local ranged=action('Ranged Attack', 2)
     r:begin(ranged); a.equal(calls[2].name, 'preshot')
     r:midcast(ranged); a.equal(calls[3].name, 'midshot')
     r:tick(nil); a.equal(calls[4].name, 'aftercast')

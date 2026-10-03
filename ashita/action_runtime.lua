@@ -38,13 +38,13 @@ function methods:begin(action)
     self.active = {action=copy(action), signature=signature(action), generation=self.generation,
         started_at=self.clock(), finished=false}
     invoke(self, 'pretarget', action)
-    invoke(self, action.action_type == 'RangedAttack' and 'preshot' or 'precast', action)
+    invoke(self, action.action_type == 'Ranged Attack' and 'preshot' or 'precast', action)
     return self.active.generation
 end
 
 function methods:midcast(action)
     if not self.active then self:begin(action) end
-    return invoke(self, action.action_type == 'RangedAttack' and 'midshot' or 'midcast', action)
+    return invoke(self, action.action_type == 'Ranged Attack' and 'midshot' or 'midcast', action)
 end
 
 function methods:tick(current)
