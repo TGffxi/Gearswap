@@ -8,6 +8,14 @@ Phase 1 audit evidence is provided by `tests/compat/test_phase1_primitives.lua`,
 surfaces statically observed across both upstream product paths; the construction
 gate remains `tests/contract/test_upstream_load.lua`.
 
+Phase 2 core-gear evidence is split at the platform boundary: LAC data and public
+`gFunc` contracts are covered by `tests/ashita/`, while
+`tests/parity/test_core_sets.lua` locks Rahvin's pre-translation logical merge
+results for default, offense-mode, weaponskill, weapon-lock, movement, buff,
+elemental, Bard-instrument, and Geomancy-handbell decisions. Live callback timing
+and actual item selection remain live-client release gates rather than simulated
+APIs.
+
 | Rahvin module | Status | Adapter / evidence |
 |---|---|---|
 | `RahvinGS/GearSets-Include.lua` | A — UPSTREAM CLEAN | Loaded unchanged through `tests/contract/test_upstream_load.lua`; dependencies supplied by class-B compatibility adapters |

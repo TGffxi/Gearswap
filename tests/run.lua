@@ -10,10 +10,11 @@ local suites = {
     action_runtime = {'tests.ashita.test_action_runtime'},
     bootstrap = {'tests.ashita.test_bootstrap'},
     state_runtime = {'tests.ashita.test_state_runtime'},
+    parity_core = {'tests.parity.test_core_sets'},
     upstream_load = {'tests.contract.test_upstream_load'},
     audit_contracts = {'tests.contract.test_gearswap_slots', 'tests.contract.test_windower_surface'},
 }
-suites.all = {'baseline', 'compat_sets', 'modes', 'include', 'phase1_primitives', 'snapshot', 'lac_data', 'equip_backend', 'action_runtime', 'bootstrap', 'state_runtime', 'upstream_load', 'audit_contracts'}
+suites.all = {'baseline', 'compat_sets', 'modes', 'include', 'phase1_primitives', 'snapshot', 'lac_data', 'equip_backend', 'action_runtime', 'bootstrap', 'state_runtime', 'upstream_load', 'audit_contracts', 'parity_core'}
 local requested = arg[1] or 'all'
 local failures, passes = 0, 0
 local function run(name)
