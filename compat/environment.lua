@@ -73,6 +73,13 @@ function M.install_runtime(env, platform)
     string.trim = string.trim or function(value)
         return (tostring(value):gsub('^%s*(.-)%s*$', '%1'))
     end
+    -- Windower addons/libs/strings.lua semantics: pad on the left until len is reached,
+    -- while preserving strings already wider than len unchanged.
+    string.lpad = string.lpad or function(value, pad, len)
+        value = tostring(value)
+        pad = tostring(pad)
+        return (pad:rep(len) .. value):sub(-(len > #value and len or #value))
+    end
     env.coroutine = {}; for key,value in pairs(coroutine) do env.coroutine[key]=value end
     env.coroutine.schedule = function(fn, delay)
         if type(platform.schedule) ~= 'function' then error('RahvinCompatError:schedule', 2) end
