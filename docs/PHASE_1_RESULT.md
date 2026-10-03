@@ -13,6 +13,27 @@ Phase 1 completed on 2026-10-03 on `master`.
 | Coherent snapshots | `99fb211` | One-generation player/world/buff/pet/equipment/inventory captures with duplicate inventory preservation. |
 | Compatibility shells and upstream construction gate | `45902c1` | GearSwap, Windower, resources, config and extdata contracts; unchanged Rahvin engine construction through mocked services. |
 
+## External audit corrections
+
+The Phase 1 compatibility audit was closed on 2026-10-03 without changing
+`RahvinGS/` or `Sample Job Files/`:
+
+- Slot translation now accepts every spelling in `RahvinGS/core.lua`'s
+  `CANON_SLOT` table. Reverse translation emits Rahvin's canonical `range`,
+  `left_ear`, `right_ear`, `left_ring`, and `right_ring` forms.
+- A contract test passes a canonical Rahvin gear set through `equip()` and
+  verifies the LuAshitacast `Ear1`, `Ear2`, `Ring1`, and `Ring2` keys.
+- Every Windower symbol observed by a static sweep has a callable compatibility
+  surface. `get_spell_recasts` and `get_party` are now explicit platform
+  adapters, and unavailable services fail with `RahvinCompatError` rather than
+  remaining `nil`.
+- The primitive sweep added the observed `T{}` methods (`insert`, `concat`, and
+  `clear`), `S{}` membership indexing, and the Modes list tracking metadata
+  consumed by Rahvin. Unsupported file and wildcard services now fail
+  explicitly instead of returning fabricated results.
+- The observed `config`, `resources`, `extdata`, `socket`, `files`, and `xml`
+  module surfaces are covered by contract tests.
+
 ## Baseline verification
 
 Before implementation, the pinned repositories were checked out independently and their revisions verified with `git rev-parse HEAD`:
@@ -25,4 +46,7 @@ The LAC callback/profile interface and Ashita event registration surface were in
 
 ## Exit gate
 
-`luajit tests/run.lua all` passes all Phase 1 suites. `RahvinGS/` and `Sample Job Files/` remain unchanged from the pinned Rahvin feature baseline, so the upstream patch ledger remains empty.
+`luajit tests/run.lua all` passes all Phase 1 suites, including the audit-specific
+primitive, slot/equip, and Windower contracts. `RahvinGS/` and
+`Sample Job Files/` remain unchanged from the pinned Rahvin feature baseline, so
+the upstream patch ledger remains empty.

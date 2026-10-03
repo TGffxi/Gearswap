@@ -2,6 +2,12 @@
 
 Statuses: **UNAUDITED**, **A — UPSTREAM CLEAN**, **B — COMPAT**, or **C — ASHITA PATCH**.
 
+Phase 1 audit evidence is provided by `tests/compat/test_phase1_primitives.lua`,
+`tests/compat/test_slots.lua`, `tests/contract/test_gearswap_slots.lua`, and
+`tests/contract/test_windower_surface.lua`. These tests cover the compatibility
+surfaces statically observed across both upstream product paths; the construction
+gate remains `tests/contract/test_upstream_load.lua`.
+
 | Rahvin module | Status | Adapter / evidence |
 |---|---|---|
 | `RahvinGS/GearSets-Include.lua` | A — UPSTREAM CLEAN | Loaded unchanged through `tests/contract/test_upstream_load.lua`; dependencies supplied by class-B compatibility adapters |
