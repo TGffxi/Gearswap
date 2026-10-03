@@ -1,0 +1,267 @@
+local a = require('tests.lib.assertions')
+
+return function()
+    package.loaded['ashita.composition'] = nil
+    local composition = require('ashita.composition')
+    a.equal(type(composition.new), 'function', 'production composition must expose new(deps)')
+
+    local native_calls = {}
+    local function mark(name, value)
+        return function(...)
+            native_calls[#native_calls + 1] = {name=name, args={...}}
+            return value
+        end
+    end
+
+    local resources = {
+        items={{id=1}}, buffs={}, job_abilities={}, weapon_skills={}, spells={},
+        elements={}, zones={}, jobs={}, bags={},
+    }
+    local native = {
+        resources=resources,
+        chat=mark('chat', true),
+        send_command=mark('send_command', true),
+        input=mark('input', true),
+        window_settings=mark('window_settings', {ui_x_res=1920, ui_y_res=1080}),
+        wc_match=mark('wc_match', true),
+        get_info=mark('get_info', {language='english', logged_in=true}),
+        get_abilities=mark('get_abilities', {job_traits={}}),
+        get_party=mark('get_party', {p0={name='Tester'}}),
+        get_mob_by_id=mark('get_mob_by_id', nil),
+        get_mob_by_index=mark('get_mob_by_index', nil),
+        get_player=mark('get_player', {id=111,index=22,name='Tester'}),
+        inject_outgoing=mark('inject_outgoing', true),
+        gettime=mark('gettime', 123.5),
+        load_config=function(path, defaults)
+            native_calls[#native_calls + 1] = {name='load_config', args={path, defaults}}
+            return defaults
+        end,
+        save_config=mark('save_config', true),
+        decode_item=mark('decode_item', {status=5}),
+        new_file=function(path)
+            native_calls[#native_calls + 1] = {name='new_file', args={path}}
+            return {path=path, exists=function() return false end, read=function() return nil end}
+        end,
+        prim={},
+    }
+    for _, op in ipairs({'create','delete','set_position','set_size','set_color','set_visibility'}) do
+        native.prim[op] = mark('prim_' .. op, true)
+    end
+    -- schedule is intentionally absent. Composition must bind platform scheduling to the
+    -- exact scheduler instance lifecycle ticks instead of accepting a second native queue.
+
+    local inventory = {iter_bag=function() return {} end}
+    local recasts = {abilities=function() return {} end, spells=function() return {} end}
+
+    local native_handlers = {}
+    local unregisters = 0
+    local events = {
+        register=function(event, alias, fn)
+            native_handlers[event .. ':' .. alias] = fn
+            return true
+        end,
+        unregister_all=function()
+            unregisters = unregisters + 1
+            for key in pairs(native_handlers) do native_handlers[key] = nil end
+            return true
+        end,
+    }
+
+    local scheduled = {}
+    local scheduler_ticks, scheduler_clears = 0, 0
+    local scheduler = {
+        schedule=function(fn, delay)
+            scheduled[#scheduled + 1] = {fn=fn, delay=delay}
+            return scheduled[#scheduled]
+        end,
+        tick=function()
+            scheduler_ticks = scheduler_ticks + 1
+            return 0
+        end,
+        clear=function()
+            scheduler_clears = scheduler_clears + 1
+            local count = #scheduled
+            scheduled = {}
+            return count
+        end,
+    }
+
+    local ipc_listener
+    local ipc_polls, ipc_closes, ipc_unsubscribes = 0, 0, 0
+    local ipc = {
+        subscribe=function(fn) ipc_listener = fn; return true end,
+        unsubscribe=function(fn)
+            a.equal(fn, ipc_listener, 'composition must detach the exact IPC listener it attached')
+            ipc_listener = nil
+            ipc_unsubscribes = ipc_unsubscribes + 1
+            return true
+        end,
+        send_rahvin=function() return true end,
+        poll=function() ipc_polls = ipc_polls + 1; return true end,
+        close=function() ipc_closes = ipc_closes + 1; return true end,
+    }
+
+    local gfunc_calls = {}
+    local gFunc = {
+        EquipSet=function(set) gfunc_calls[#gfunc_calls + 1] = {'EquipSet', set}; return true end,
+        Enable=function(slot) gfunc_calls[#gfunc_calls + 1] = {'Enable', slot}; return true end,
+        Disable=function(slot) gfunc_calls[#gfunc_calls + 1] = {'Disable', slot}; return true end,
+        CancelAction=function() gfunc_calls[#gfunc_calls + 1] = {'CancelAction'}; return true end,
+    }
+    local gData = {
+        GetAction=function() return nil end,
+        GetActionTarget=function() return nil end,
+        GetPlayer=function() return {Name='Tester'} end,
+    }
+
+    local function snapshot()
+        return {
+            player={name='Tester', main_job='WAR', sub_job='SAM', id=111, index=22,
+                status='Idle', tp=0, equipment={}, inventory={}},
+            world={day='Firesday', weather='Clear', area='Test'},
+            buffactive={}, buffs={}, pet={isvalid=false}, equipment={}, inventory={},
+        }
+    end
+
+    local texts = {new=function(_, cfg)
+        cfg.text.fonts = cfg.text.fonts or {}
+        cfg.flags.italic = cfg.flags.italic or false
+        cfg.flags.right = cfg.flags.right or false
+        cfg.flags.bottom = cfg.flags.bottom or false
+        local box = {_x=cfg.pos and cfg.pos.x or 0, _y=cfg.pos and cfg.pos.y or 0}
+        return setmetatable(box, {__index=function(_, key)
+            if key == 'pos' then
+                return function(self, x, y)
+                    if x then self._x, self._y = x, y else return self._x, self._y end
+                end
+            end
+            if key == 'extents' then return function() return 100, 20 end end
+            return function() return true end
+        end})
+    end}
+
+    local display_hides, display_destroys = 0, 0
+    local display = {
+        hide=function() display_hides = display_hides + 1; return true end,
+        destroy=function() display_destroys = display_destroys + 1; return true end,
+    }
+    local keybind_applies, keybind_clears = 0, 0
+    local keybinds = {
+        apply=function() keybind_applies = keybind_applies + 1; return true end,
+        clear=function() keybind_clears = keybind_clears + 1; return true end,
+    }
+    local command_registers, command_unregisters = 0, 0
+    local commands = {
+        register=function() command_registers = command_registers + 1; return true end,
+        unregister=function() command_unregisters = command_unregisters + 1; return true end,
+    }
+    local slot_releases, special_resets = 0, 0
+
+    local settings = {Keybinds={}}
+    local graph = composition.new({
+        native=native,
+        inventory=inventory,
+        recasts=recasts,
+        events=events,
+        scheduler=scheduler,
+        ipc_factory=function() return ipc end,
+        ipc_to_rahvin=function(payload) return payload and payload.message or nil end,
+        gData=gData,
+        gFunc=gFunc,
+        texts=texts,
+        snapshot=snapshot,
+        job_path='tests/fixtures/production_job',
+        settings=settings,
+        display=display,
+        keybinds=keybinds,
+        commands=commands,
+        release_slots=function() slot_releases = slot_releases + 1; return true end,
+        reset_special=function() special_resets = special_resets + 1; return true end,
+    })
+
+    a.equal(type(graph), 'table')
+    a.equal(type(graph.profile), 'table', 'composition must return the installable LAC profile')
+    a.equal(type(graph.platform), 'table', 'composition must expose its shared platform for diagnostics')
+    a.equal(type(graph.env), 'table', 'composition must expose the Rahvin execution environment')
+    a.equal(type(graph.engine), 'table', 'composition must bind Rahvin globals as one engine adapter')
+    a.equal(type(graph.lifecycle), 'table', 'composition must build lifecycle around the same graph')
+    a.equal(type(graph.runtime_events), 'table', 'composition must build runtime events around the same platform')
+    a.equal(type(graph.action_runtime), 'table')
+    a.equal(type(graph.state_runtime), 'table')
+    a.equal(type(graph.backend), 'table')
+
+    a.equal(graph.platform.resources, resources, 'composition must retain one production resource identity')
+    a.equal(graph.env.require('resources').items, resources.items,
+        'compat resources must resolve through the same platform resource collections')
+    a.equal(graph.profile.Sets, graph.env.sets, 'LAC profile and Rahvin environment must share the same sets table')
+    a.equal(graph.profile._backend, graph.backend, 'GearSwap and bootstrap must share one LAC equip backend')
+    a.equal(graph.profile._runtime, graph.action_runtime, 'bootstrap must use the graph action runtime')
+    a.equal(graph.action_runtime.engine, graph.engine, 'action runtime must invoke the same Rahvin engine adapter')
+    a.equal(graph.state_runtime.engine, graph.engine, 'state runtime must invoke the same Rahvin engine adapter')
+
+    a.equal(graph.env.Rahvin_GS, '2.1', 'unchanged Rahvin engine must load inside the production environment')
+    for _, name in ipairs({'pretarget','precast','midcast','aftercast','status_change','buff_change','pet_change'}) do
+        a.equal(type(graph.env[name]), 'function', 'Rahvin engine global missing after production load: ' .. name)
+    end
+    for _, name in ipairs({'load','unload','command','default','pretarget','precast','midcast','preshot','midshot',
+        'aftercast','status_change','buff_change','pet_change','is_busy'}) do
+        a.equal(type(graph.engine[name]), 'function', 'production engine adapter missing method: ' .. name)
+    end
+
+    -- Rahvin's root schedules eleven delayed startup functions while it loads. Production
+    -- composition must capture those registrations and hand them to lifecycle, not enqueue
+    -- them early and then enqueue an identical second set during lifecycle.load().
+    a.equal(#scheduled, 0, 'Rahvin startup work must not enter the live scheduler before LAC OnLoad')
+
+    local direct_scheduled = false
+    graph.env.coroutine.schedule(function() direct_scheduled = true end, 9)
+    a.equal(#scheduled, 1, 'runtime coroutine.schedule must use the lifecycle scheduler instance')
+    a.equal(scheduled[1].delay, 9)
+    a.equal(direct_scheduled, false)
+
+    local prerenders, ipc_messages = 0, {}
+    graph.env.windower.register_event('prerender', function() prerenders = prerenders + 1 end)
+    graph.env.windower.register_event('ipc message', function(message) ipc_messages[#ipc_messages + 1] = message end)
+
+    graph.profile.OnLoad()
+    a.equal(graph.env.production_fixture_loads, 1, 'LAC OnLoad must call the loaded Rahvin job get_sets exactly once')
+    a.equal(#scheduled, 12,
+        'lifecycle must add exactly the eleven captured Rahvin startup tasks to the same scheduler queue')
+    a.equal(keybind_applies, 1)
+    a.equal(command_registers, 1)
+    a.equal(slot_releases, 1)
+    a.equal(type(ipc_listener), 'function', 'lifecycle IPC generation must attach to the shared platform')
+
+    local frame = native_handlers['d3d_present:rahvings_runtime_tick']
+    a.equal(type(frame), 'function', 'composition lifecycle must own one native d3d frame handler')
+    frame()
+    a.equal(scheduler_ticks, 1, 'native frame must tick the shared scheduler')
+    a.equal(ipc_polls, 1, 'native frame must poll the same IPC instance lifecycle attached')
+    a.equal(prerenders, 1, 'native frame must reach Rahvin logical prerender handlers on the same platform')
+
+    ipc_listener({message='RAHVIN|TEST'})
+    a.deep_equal(ipc_messages, {'RAHVIN|TEST'}, 'attached IPC must dispatch through the shared Rahvin event surface')
+
+    local config = graph.env.require('config')
+    local loaded = config.load('probe', {x=1})
+    a.equal(loaded.x, 1)
+    a.equal(native_calls[#native_calls].name, 'load_config', 'config compatibility must resolve through platform')
+    local extdata = graph.env.require('extdata')
+    extdata.decode({raw={Extra='x'}})
+    a.equal(native_calls[#native_calls].name, 'decode_item', 'extdata compatibility must resolve through platform')
+    local files = graph.env.require('files')
+    local file = files.new('probe.txt')
+    a.equal(file.path, 'probe.txt')
+    a.equal(native_calls[#native_calls].name, 'new_file', 'files compatibility must resolve through platform')
+
+    graph.profile.OnUnload()
+    a.equal(graph.env.production_fixture_unloads, 1, 'LAC OnUnload must invoke Rahvin file_unload exactly once')
+    a.equal(ipc_unsubscribes, 1, 'unload must detach the shared IPC listener')
+    a.equal(ipc_closes, 1, 'unload must close the same IPC generation')
+    a.equal(command_unregisters, 1)
+    a.equal(keybind_clears, 1)
+    a.equal(scheduler_clears, 1)
+    a.equal(special_resets, 1)
+    a.equal(display_destroys, 1)
+    a.equal(unregisters, 1, 'unload must tear down the same native event registry')
+end
