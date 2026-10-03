@@ -19,7 +19,7 @@ end
 return function()
     local cases = {
         {{ActionType='Spell', Name='Fire', Id=144, Type='Black Magic', Skill='Elemental Magic', Element='Fire',
-            CastTime=2000, Recast=8000, Resource={RecastTimerId=12,Element=0}}, 'Magic', 'BlackMagic'},
+            CastTime=2000, Recast=8000, Resource={Index=144,Type=2,Element=0}}, 'Magic', 'BlackMagic'},
         {{ActionType='Weaponskill', Name='Savage Blade', Id=42}, 'Ability', 'WeaponSkill'},
         {{ActionType='Ability', Name='Provoke', Id=5, Type='Unknown', Resource={RecastTimerId=1}}, 'Ability', 'JobAbility'},
         {{ActionType='Ranged', Name='Ranged', Id=0}, 'Ranged Attack', 'Ranged Attack'},
@@ -33,7 +33,7 @@ return function()
         a.equal(got.target.distance, 4.5); a.equal(got.target.status, 'Engaged')
     end
     local spell = lac_data.action(provider(cases[1][1]))
-    a.equal(spell.element, 'Fire'); a.equal(spell.element_id, 0); a.equal(spell.skill, 'Elemental Magic'); a.equal(spell.recast_id, 12)
+    a.equal(spell.element, 'Fire'); a.equal(spell.element_id, 0); a.equal(spell.skill, 'Elemental Magic'); a.equal(spell.recast_id, 144)
     a.equal(lac_data.action(provider({ActionType='Ability',Name='Light Shot',Id=1,Type='Quick Draw'})).type,'CorsairShot')
     a.equal(lac_data.action(provider({ActionType='Spell',Name='Cure',Id=1,Type='White Magic'})).type,'WhiteMagic')
     a.equal(lac_data.action(provider(nil)), nil)
