@@ -8,19 +8,25 @@ Phase 1 audit evidence is provided by `tests/compat/test_phase1_primitives.lua`,
 surfaces statically observed across both upstream product paths; the construction
 gate remains `tests/contract/test_upstream_load.lua`.
 
-Phase 2 core-gear evidence is split at the platform boundary: LAC data and public
-`gFunc` contracts are covered by `tests/ashita/`, while
-`tests/parity/test_core_sets.lua` locks Rahvin's pre-translation logical merge
-results for default, offense-mode, weaponskill, weapon-lock, movement, buff,
-elemental, Bard-instrument, and Geomancy-handbell decisions. Live callback timing
-and actual item selection remain live-client release gates rather than simulated
-APIs.
+Phase 2 core-gear evidence is split at the platform boundary. LAC translation,
+action lifecycle, bootstrap ordering, equipment buffering, and state transitions
+are covered under `tests/ashita/`. `tests/parity/test_core_sets.lua` now executes
+the unchanged Rahvin engine/builders in a controlled harness and captures the
+actual pre-LAC GearSwap-shaped logical result. `tests/parity/test_merge_precedence.lua`
+keeps the simpler set-combine precedence cases separate. Live packet timing and
+actual client item selection remain release gates rather than simulated APIs.
+
+The Phase 2 audit additionally locks Geomancy/Trust resource taxonomy, Windower-style
+spell recast identity, the full Rahvin ability-family taxonomy used by the builders,
+SELF target recovery from the pinned LAC player/target surfaces, LAC `Resend`
+semantics, identical sequential action generations, and Rahvin-compatible status,
+buff, and pet busy behavior.
 
 | Rahvin module | Status | Adapter / evidence |
 |---|---|---|
 | `RahvinGS/GearSets-Include.lua` | A — UPSTREAM CLEAN | Loaded unchanged through `tests/contract/test_upstream_load.lua`; dependencies supplied by class-B compatibility adapters |
 | `RahvinGS/Rahvin-Engine.lua` | A — UPSTREAM CLEAN | Loaded unchanged through `tests/contract/test_upstream_load.lua`; dependencies supplied by class-B compatibility adapters |
-| `RahvinGS/builders.lua` | A — UPSTREAM CLEAN | Loaded unchanged through `tests/contract/test_upstream_load.lua`; dependencies supplied by class-B compatibility adapters |
+| `RahvinGS/builders.lua` | A — UPSTREAM CLEAN | Executed unchanged by `tests/parity/test_core_sets.lua` and loaded by `tests/contract/test_upstream_load.lua` |
 | `RahvinGS/commands.lua` | A — UPSTREAM CLEAN | Loaded unchanged through `tests/contract/test_upstream_load.lua`; dependencies supplied by class-B compatibility adapters |
 | `RahvinGS/core.lua` | A — UPSTREAM CLEAN | Loaded unchanged through `tests/contract/test_upstream_load.lua`; dependencies supplied by class-B compatibility adapters |
 | `RahvinGS/display.lua` | A — UPSTREAM CLEAN | Loaded unchanged through `tests/contract/test_upstream_load.lua`; dependencies supplied by class-B compatibility adapters |
