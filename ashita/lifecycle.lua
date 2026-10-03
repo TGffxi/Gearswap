@@ -102,7 +102,7 @@ function M.new(deps)
 
         -- Stop every producer before releasing input, visuals and held equipment.
         scheduler_clear()
-        action_reset()
+        action_reset(action_runtime)
         deps.reset_special(reason)
         keybind_clear()
         display_hide()
