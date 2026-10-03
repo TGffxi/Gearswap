@@ -33,10 +33,18 @@ end
 
 function methods:begin(action)
     if action == nil then error('RahvinCompatError:action.begin_nil', 2) end
-    if self.active and self.active.signature == signature(action) then return self.active.generation end
+    local next_signature = signature(action)
+    -- LuAshitacast marks packet-level retransmission explicitly as Resend. Only an
+    -- actual resend of the same logical action is idempotent. A new non-resend
+    -- callback may legitimately have the same action/target signature as the
+    -- previous action, and LAC can deliver it before this adapter observes an
+    -- intervening HandleDefault(nil).
+    if self.active and self.active.signature == next_signature and action.resend == true then
+        return self.active.generation
+    end
     if self.active then self:_finish(true) end
     self.generation = self.generation + 1
-    self.active = {action=copy(action), signature=signature(action), generation=self.generation,
+    self.active = {action=copy(action), signature=next_signature, generation=self.generation,
         started_at=self.clock(), finished=false}
     invoke(self, 'pretarget', action)
     invoke(self, action.action_type == 'Ranged Attack' and 'preshot' or 'precast', action)
