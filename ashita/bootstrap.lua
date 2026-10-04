@@ -27,8 +27,22 @@ function M.create(deps)
     local settings = deps.settings or {}
     local profile = {Sets=deps.sets or {}}
     local function flush() return backend:flush() end
-    local function begin() runtime:begin(lac_data.action(gData)); flush() end
-    local function middle() runtime:midcast(lac_data.action(gData)); flush() end
+    local function refresh_action_snapshot()
+        if type(deps.snapshot) ~= 'function' then
+            error('RahvinCompatError:bootstrap.snapshot', 2)
+        end
+        return deps.snapshot(gData)
+    end
+    local function begin()
+        refresh_action_snapshot()
+        runtime:begin(lac_data.action(gData))
+        flush()
+    end
+    local function middle()
+        refresh_action_snapshot()
+        runtime:midcast(lac_data.action(gData))
+        flush()
+    end
 
     profile.OnLoad=function()
         invoke(engine, 'load')
