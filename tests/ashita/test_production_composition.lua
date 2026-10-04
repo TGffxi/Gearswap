@@ -288,13 +288,15 @@ return function()
     graph.env.pretarget_custom = function()
         cancel_seen_at_pretarget = graph.env._global.cancel_spell
     end
-    current_action={ActionType='Item',Name='Echo Drops',Id=100,Type='Item',
-        CastTime=1000,Recast=0,Resend=false}
-    graph.profile.HandleItem()
+    -- Exercise only the Wave-2 ownership boundary here. Running a complete HandleItem would
+    -- deliberately enter later pet/build logic whose pet_midaction compatibility belongs to
+    -- Wave 5 and must not become an accidental prerequisite for this gate.
+    graph.engine.pretarget({
+        action_type='Item', type='Item', name='Echo Drops', english='Echo Drops',
+        id=100, target={name='Tester', type='SELF'},
+    })
     a.equal(cancel_seen_at_pretarget, false,
         'a new player action must reset stale GearSwap cancel state before Rahvin pretarget')
-    current_action=nil
-    graph.profile.HandleDefault()
     graph.env.pretarget_custom=nil
 
     local frame = native_handlers['d3d_present:rahvings_runtime_tick']
