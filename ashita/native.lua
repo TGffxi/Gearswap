@@ -131,9 +131,23 @@ function M.new(deps)
     end
 
     function native.send_command(command)
+        command = tostring(command or '')
+        if command:match('^%s*bind%s+') or command:match('^%s*unbind%s+') then
+            local bridge = deps.keybind_command
+            if type(bridge) ~= 'function' then
+                error('RahvinCompatError:native.keybind_bridge', 2)
+            end
+            local ok, result = pcall(bridge, command)
+            if not ok then error(result, 2) end
+            if result == false then
+                error('RahvinCompatError:native.keybind_bridge:' .. command, 2)
+            end
+            return true
+        end
+
         local chat = get_chat_manager(core)
         if chat == nil then error('RahvinCompatError:native.chat_manager', 2) end
-        method(chat, 'QueueCommand', 'chat.QueueCommand')(chat, -1, tostring(command or ''))
+        method(chat, 'QueueCommand', 'chat.QueueCommand')(chat, -1, command)
         return true
     end
 
@@ -395,6 +409,12 @@ function M.production(deps)
     local extdata = deps.extdata
     if extdata == nil then extdata = load_module('ashita.extdata', 'extdata_module') end
 
+    local keybind_command = deps.keybind_command
+    if keybind_command == nil then
+        local keybinds = load_module('ashita.keybinds', 'keybinds_module')
+        keybind_command = method(keybinds, 'bridge', 'keybinds.bridge')
+    end
+
     local get_device = method(d3d8, 'get_device', 'd3d8.get_device')
     local gettime = method(socket, 'gettime', 'socket.gettime')
     local decode = method(extdata, 'decode', 'extdata.decode')
@@ -425,6 +445,7 @@ function M.production(deps)
         viewport=viewport,
         clock=function() return gettime() end,
         decode_item=function(item) return decode(item) end,
+        keybind_command=keybind_command,
         language=deps.language,
     })
 end
