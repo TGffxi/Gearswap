@@ -86,6 +86,17 @@ function M.install_runtime(env, platform)
         pad = tostring(pad)
         return (pad:rep(len) .. value):sub(-(len > #value and len or #value))
     end
+    -- Windower's pack/string helpers accept packet offsets as zero-based byte offsets.
+    -- Ashita's struct.unpack position is Lua-string based (1-based), so translate once here.
+    string.unpack = string.unpack or function(value, format, offset)
+        local struct_lib = rawget(_G, 'struct')
+        if type(struct_lib) ~= 'table' or type(struct_lib.unpack) ~= 'function' then
+            error('RahvinCompatError:struct.unpack', 2)
+        end
+        offset = offset or 0
+        if type(offset) ~= 'number' then error('RahvinCompatError:string.unpack_offset', 2) end
+        return struct_lib.unpack(format, value, offset + 1)
+    end
     env.coroutine = {}; for key,value in pairs(coroutine) do env.coroutine[key]=value end
     env.coroutine.schedule = function(fn, delay)
         if type(platform.schedule) ~= 'function' then error('RahvinCompatError:schedule', 2) end
