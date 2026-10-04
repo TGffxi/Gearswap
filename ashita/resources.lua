@@ -106,17 +106,18 @@ local ABILITY_TYPES = {
 }
 
 local function ability_type(raw)
-    -- LuAshitacast resolves its one-based constants table with raw Type + 1.  Keep the
-    -- Rahvin-facing names here without leaking that indexing convention into upstream.
+    -- LuAshitacast classifies these families from the ability recast timer id. Keep the
+    -- Rahvin-facing names here without leaking LAC's naming/indexing convention upstream.
+    local recast = tonumber(raw.RecastTimerId)
+    if recast == 193 then return 'CorsairRoll' end
+    if recast == 195 then return 'CorsairShot' end
+    if recast == 10 then return 'Rune' end
+    if recast == 102 then return 'Ready' end
+    if recast == 173 then return 'Ward' end
+    if recast == 174 then return 'BloodPactRage' end
+
     local tid = tonumber(raw.Type)
-    if tid == nil then return 'JobAbility' end
-    if tid == 193 then return 'CorsairRoll' end
-    if tid == 195 then return 'CorsairShot' end
-    if tid == 10 then return 'Rune' end
-    if tid == 102 then return 'Ready' end
-    if tid == 173 then return 'Ward' end
-    if tid == 174 then return 'BloodPactRage' end
-    return ABILITY_TYPES[tid] or 'JobAbility'
+    return (tid and ABILITY_TYPES[tid]) or 'JobAbility'
 end
 
 local function make_item(source, id)
