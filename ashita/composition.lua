@@ -79,9 +79,18 @@ function M.new(deps)
     need_method(scheduler, 'clear', 'scheduler.clear')
 
     local events = need(deps.events, 'events')
-    local native = need(deps.native, 'native')
     local gData = need(deps.gData, 'gData')
     local gFunc = need(deps.gFunc, 'gFunc')
+
+    local native = deps.native
+    if native == nil then
+        local native_module = require('ashita.native')
+        local production = need_method(native_module, 'production', 'native.production')
+        native = production({
+            scheduler=scheduler,
+            gData=gData,
+        })
+    end
     local snapshot_source = need(deps.snapshot, 'snapshot')
     if type(snapshot_source) ~= 'function' then
         error('RahvinCompatError:composition.snapshot', 2)
