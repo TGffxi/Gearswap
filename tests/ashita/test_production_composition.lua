@@ -1,6 +1,15 @@
 local a = require('tests.lib.assertions')
 
 return function()
+    local previous_native_module = package.loaded['ashita.native']
+    local resolved_native
+    local native_production_calls = {}
+    package.loaded['ashita.native'] = {
+        production=function(deps)
+            native_production_calls[#native_production_calls + 1] = deps
+            return resolved_native
+        end,
+    }
     package.loaded['ashita.composition'] = nil
     local composition = require('ashita.composition')
     a.equal(type(composition.new), 'function', 'production composition must expose new(deps)')
@@ -49,6 +58,7 @@ return function()
     end
     -- schedule is intentionally absent. Composition must bind platform scheduling to the
     -- exact scheduler instance lifecycle ticks instead of accepting a second native queue.
+    resolved_native = native
 
     local inventory = {iter_bag=function() return {} end}
     local recasts = {abilities=function() return {} end, spells=function() return {} end}
@@ -181,7 +191,6 @@ return function()
 
     local settings = {Keybinds={}}
     local graph = composition.new({
-        native=native,
         inventory=inventory,
         recasts=recasts,
         events=events,
@@ -199,6 +208,13 @@ return function()
         release_slots=function() slot_releases = slot_releases + 1; return true end,
         reset_special=function() special_resets = special_resets + 1; return true end,
     })
+
+    a.equal(#native_production_calls, 1,
+        'composition must build the production native adapter when deps.native is absent')
+    a.equal(native_production_calls[1].scheduler, scheduler,
+        'production native adapter must share lifecycle scheduler')
+    a.equal(native_production_calls[1].gData, gData,
+        'production native adapter must share LuAshitacast gData')
 
     a.equal(type(graph), 'table')
     a.equal(type(graph.profile), 'table', 'composition must return the installable LAC profile')
@@ -280,6 +296,7 @@ return function()
 
     package.preload['fonts'] = previous_fonts_preload
     package.loaded['fonts'] = previous_fonts_loaded
+    package.loaded['ashita.native'] = previous_native_module
 
     graph.profile.OnUnload()
     a.equal(graph.env.production_fixture_unloads, 1, 'LAC OnUnload must invoke Rahvin file_unload exactly once')
