@@ -84,6 +84,35 @@ function M.action(gData)
     }
 end
 
+function M.pet_action(gData)
+    local fn = gData and gData.GetPetAction
+    if fn == nil then return nil end
+    if type(fn) ~= 'function' then error('RahvinCompatError:gData.GetPetAction', 2) end
+    local value = fn()
+    if value == nil then return nil end
+
+    local action_type, rahvin_type
+    if value.ActionType == 'Spell' then
+        action_type = 'Magic'
+        rahvin_type = spell_types[value.Type] or value.Type
+    elseif value.ActionType == 'Ability' then
+        action_type = 'Ability'
+        rahvin_type = ability_types[value.Type] or value.Type or 'PetCommand'
+    elseif value.ActionType == 'MobSkill' then
+        action_type = 'Monster Move'
+        rahvin_type = value.Type or 'Monster Move'
+    else
+        error('RahvinCompatError:unknown_pet_action_type:' .. tostring(value.ActionType), 2)
+    end
+
+    return {
+        english=value.Name, name=value.Name, id=value.Id,
+        action_type=action_type, type=rahvin_type, prefix='/pet',
+        skill=value.Skill, element=value.Element,
+        cast_time=value.CastTime, recast=value.Recast, mp_cost=value.MpCost,
+    }
+end
+
 function M.target(gData)
     local player = get(gData, 'GetPlayer')
     return entity(get(gData, 'GetTarget'), player and player.Name or nil)
