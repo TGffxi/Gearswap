@@ -125,7 +125,9 @@ return function()
         GetPlayer=function() return {Name='Tester'} end,
     }
 
+    local snapshot_calls = 0
     local function snapshot()
+        snapshot_calls = snapshot_calls + 1
         return {
             player={name='Tester', main_job='WAR', sub_job='SAM', id=111, index=22,
                 status='Idle', tp=0, equipment={}, inventory={}},
@@ -299,15 +301,81 @@ return function()
         'a new player action must reset stale GearSwap cancel state before Rahvin pretarget')
     graph.env.pretarget_custom=nil
 
+    -- Wave 3: wrapped Windower events are one GearSwap transaction. Refresh globals once
+    -- before all handlers, merge every equip request, then commit exactly one EquipSet.
+    local function equipset_count()
+        local count = 0
+        for _, call in ipairs(gfunc_calls) do
+            if call[1] == 'EquipSet' then count = count + 1 end
+        end
+        return count
+    end
+
+    local wrapped_snapshot_before = snapshot_calls
+    local wrapped_equips_before = equipset_count()
+    local wrapped_order = {}
+    graph.env.windower.register_event('wave3 wrapped', function()
+        wrapped_order[#wrapped_order + 1] = 'first'
+        a.equal(snapshot_calls, wrapped_snapshot_before + 1,
+            'wrapped event must refresh GearSwap globals before its first handler')
+        graph.env.equip({head='Wrapped Helm'})
+    end)
+    graph.env.windower.register_event('wave3 wrapped', function()
+        wrapped_order[#wrapped_order + 1] = 'second'
+        a.equal(snapshot_calls, wrapped_snapshot_before + 1,
+            'wrapped event must refresh only once for all handlers')
+        graph.env.equip({body='Wrapped Mail'})
+    end)
+    a.equal(graph.platform:emit('wave3 wrapped'), 2)
+    a.deep_equal(wrapped_order, {'first','second'})
+    a.equal(snapshot_calls, wrapped_snapshot_before + 1,
+        'wrapped event must own exactly one snapshot refresh')
+    a.equal(equipset_count(), wrapped_equips_before + 1,
+        'wrapped event must flush all handler gear exactly once')
+    local wrapped_set = gfunc_calls[#gfunc_calls][2]
+    a.equal(wrapped_set.Head, 'Wrapped Helm')
+    a.equal(wrapped_set.Body, 'Wrapped Mail')
+
+    -- Raw handlers deliberately cannot commit gear. Any equip buffered inside the raw scope
+    -- must be discarded at that boundary and must never leak into a later wrapped event.
+    local raw_snapshot_before = snapshot_calls
+    local raw_equips_before = equipset_count()
+    graph.env.windower.raw_register_event('wave3 raw', function()
+        graph.env.equip({head='Raw Leak Helm'})
+    end)
+    a.equal(graph.platform:emit('wave3 raw'), 1)
+    a.equal(snapshot_calls, raw_snapshot_before,
+        'raw event must not run GearSwap wrapped snapshot refresh')
+    a.equal(equipset_count(), raw_equips_before,
+        'raw event must not commit buffered equipment')
+
+    graph.env.windower.register_event('wave3 after raw', function() end)
+    a.equal(graph.platform:emit('wave3 after raw'), 1)
+    a.equal(equipset_count(), raw_equips_before,
+        'equipment buffered by a raw event must be discarded, not flushed by the next wrapped event')
+
+    -- Actual unchanged Rahvin registrations: target change and IPC are wrapped, while both
+    -- prerender drivers are raw. These checks exercise the real root registrations.
+    local target_snapshot_before = snapshot_calls
+    graph.platform:emit('target change', 41, 40)
+    a.equal(snapshot_calls, target_snapshot_before + 1,
+        'Rahvin target change must execute with wrapped refresh semantics')
+
     local frame = native_handlers['d3d_present:rahvings_runtime_tick']
     a.equal(type(frame), 'function', 'composition lifecycle must own one native d3d frame handler')
+    local frame_snapshot_before = snapshot_calls
     frame()
     a.equal(scheduler_ticks, 1, 'native frame must tick the shared scheduler')
     a.equal(ipc_polls, 1, 'native frame must poll the same IPC instance lifecycle attached')
     a.equal(prerenders, 1, 'native frame must reach Rahvin logical prerender handlers on the same platform')
+    a.equal(snapshot_calls, frame_snapshot_before,
+        'Rahvin prerender registrations are raw and must not refresh GearSwap globals')
 
+    local ipc_snapshot_before = snapshot_calls
     ipc_listener({message='RAHVIN|TEST'})
     a.deep_equal(ipc_messages, {'RAHVIN|TEST'}, 'attached IPC must dispatch through the shared Rahvin event surface')
+    a.equal(snapshot_calls, ipc_snapshot_before + 1,
+        'Rahvin IPC message registration must execute with wrapped refresh semantics')
 
     local config = graph.env.require('config')
     local loaded = config.load('probe', {x=1})
