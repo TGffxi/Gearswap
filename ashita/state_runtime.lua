@@ -20,8 +20,8 @@ local function call(engine, name, ...)
     return fn(...)
 end
 
-function M.new(engine)
-    return setmetatable({engine=engine or {}, previous=nil, pending={}}, methods)
+function M.new(engine, events)
+    return setmetatable({engine=engine or {}, events=events, previous=nil, pending={}}, methods)
 end
 
 function methods:_busy()
@@ -34,6 +34,13 @@ end
 -- the one transition family that is deferred by this adapter while the engine is busy.
 function methods:_emit(name, ...)
     return call(self.engine,name,...)
+end
+
+function methods:_emit_event(name, ...)
+    local owner = self.events
+    local fn = owner and owner.emit
+    if type(fn) ~= 'function' then return 0 end
+    return fn(owner, name, ...)
 end
 
 function methods:_emit_buff(...)
@@ -54,7 +61,13 @@ function methods:update(snapshot)
     end
     self:_flush()
     local counts,names=buff_state(snapshot.buffs)
-    local current={status=snapshot.player.status,buffs=counts,names=names,pet=snapshot.pet}
+    local current={
+        status=snapshot.player.status,
+        sub_job=snapshot.player.sub_job,
+        buffs=counts,
+        names=names,
+        pet=snapshot.pet,
+    }
     local old=self.previous
     if not old then self.previous=current; return false end
     if current.status~=old.status then self:_emit('status_change',current.status,old.status) end
@@ -63,12 +76,18 @@ function methods:update(snapshot)
     table.sort(ordered,function(a,b) return tostring(a)<tostring(b) end)
     for _,id in ipairs(ordered) do
         local before=(old.buffs[id] or 0)>0; local after=(current.buffs[id] or 0)>0
-        if before~=after then self:_emit_buff(current.names[id] or old.names[id] or tostring(id),after) end
+        if before~=after then
+            self:_emit_event(after and 'gain buff' or 'lose buff', id)
+            self:_emit_buff(current.names[id] or old.names[id] or tostring(id),after)
+        end
     end
     local old_id=old.pet and (old.pet.id or old.pet.index); local new_id=current.pet and (current.pet.id or current.pet.index)
     if old_id~=new_id then
         if old.pet then self:_emit('pet_change',old.pet,false) end
         if current.pet then self:_emit('pet_change',current.pet,true) end
+    end
+    if current.sub_job~=old.sub_job then
+        self:_emit('sub_job_change',current.sub_job,old.sub_job)
     end
     self.previous=current
     return true
