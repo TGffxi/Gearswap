@@ -61,6 +61,13 @@ local function action_packet()
     return string.char(unpack(out))
 end
 
+local function logout_packet(flag)
+    local bytes = {}
+    for i = 1, 8 do bytes[i] = 0 end
+    bytes[0x04 + 1] = flag or 0
+    return string.char(unpack(bytes))
+end
+
 local function zone_packet(zone)
     -- Ashita v4 pinned source documents 0x00A zone id as uint16 LE at +0x30.
     local bytes = {}
@@ -112,6 +119,10 @@ return function()
         a.equal(newer_zone, 292)
         a.equal(previous_zone, 291, 'subsequent raw zone event must use decoder zone history')
         a.equal(decoder.target_index({id=0x015}), 777)
+        a.equal(decoder.logout({id=0x00B, data=logout_packet(0)}), false,
+            '0x00B without Ashita logout flag is only a zone exit')
+        a.equal(decoder.logout({id=0x00B, data=logout_packet(1)}), true,
+            'pinned Ashita v4 logout detector is byte +0x04 == 1')
 
         -- Production packets.new without an injected decoder must use Ashita memory for
         -- old-zone and target state, and the raw decoder for 0x028.
@@ -137,12 +148,15 @@ return function()
             action=function(value) seen.action=value end,
             main_engine=function() end,
             target_change=function(new, old) seen.target={new,old} end,
+            logout=function() seen.logout=(seen.logout or 0)+1 end,
         })
         a.equal(service.on_incoming({id=0x028, data=action_packet()}), true)
         a.equal(seen.action.actor_id, 123456,
             'packets default path must decode raw Ashita action packets')
         a.equal(service.on_incoming({id=0x00A, data_modified=zone_packet(291)}), true)
         a.deep_equal(seen.zone, {291,100}, 'packets default path must decode raw zone packet')
+        a.equal(service.on_incoming({id=0x00B, data=logout_packet(1)}), true)
+        a.equal(seen.logout, 1, 'packets default path must decode pinned Ashita logout packet')
         service.on_outgoing({id=0x015, data=''})
         service.on_outgoing({id=0x015, data=''})
         a.equal(seen.target, nil, 'unchanged production target index must not synthesize a change')
