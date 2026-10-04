@@ -134,9 +134,6 @@ function M.new(deps)
         commands_register()
         keybind_apply(settings)
         event_register('d3d_present', 'rahvings_runtime_tick', frame_tick)
-        event_register('logout', 'rahvings_runtime_logout', function()
-            return service.logout()
-        end)
 
         for _, step in ipairs(STARTUP) do
             schedule(startup[step[1]], step[2])
