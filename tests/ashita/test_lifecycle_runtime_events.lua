@@ -86,6 +86,8 @@ return function()
 
     local frame = registered['d3d_present:rahvings_runtime_tick']
     a.equal(type(frame), 'function')
+    a.equal(registered['logout:rahvings_runtime_logout'], nil,
+        'Ashita v4 has no native logout event; logout ownership must come from packet_in 0x00B')
     local before_frame = #calls
     frame()
     local frame_names = {}
