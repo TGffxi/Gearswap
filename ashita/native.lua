@@ -406,8 +406,23 @@ function M.production(deps)
     local socket = deps.socket
     if socket == nil then socket = load_module('socket', 'socket_module') end
 
+    local get_device = method(d3d8, 'get_device', 'd3d8.get_device')
+    local gettime = method(socket, 'gettime', 'socket.gettime')
+
     local extdata = deps.extdata
-    if extdata == nil then extdata = load_module('ashita.extdata', 'extdata_module') end
+    if extdata == nil then
+        local extdata_module = load_module('ashita.extdata', 'extdata_module')
+        if type(extdata_module.decode) == 'function' then
+            extdata = extdata_module
+        else
+            local production = method(extdata_module, 'production', 'extdata.production')
+            extdata = production({
+                core=core,
+                gData=gData,
+                clock=function() return gettime() end,
+            })
+        end
+    end
 
     local keybind_command = deps.keybind_command
     if keybind_command == nil then
@@ -415,8 +430,6 @@ function M.production(deps)
         keybind_command = method(keybinds, 'bridge', 'keybinds.bridge')
     end
 
-    local get_device = method(d3d8, 'get_device', 'd3d8.get_device')
-    local gettime = method(socket, 'gettime', 'socket.gettime')
     local decode = method(extdata, 'decode', 'extdata.decode')
 
     local function viewport()
