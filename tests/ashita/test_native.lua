@@ -20,7 +20,11 @@ return function()
             return true
         end,
         SetInputText=function(_, value)
-            log('input', value)
+            log('input_text', value)
+            return true
+        end,
+        ExecuteScript=function(_, file, args, threaded)
+            log('script', file, args, threaded)
             return true
         end,
     }
@@ -148,7 +152,8 @@ return function()
     for _, name in ipairs({
         'chat','send_command','input','window_settings','wc_match','get_info',
         'get_abilities','get_party','get_mob_by_id','get_mob_by_index','get_player',
-        'inject_outgoing','schedule','gettime','load_config','save_config','decode_item','new_file',
+        'inject_outgoing','cancel_buff','execute_script','schedule','gettime',
+        'load_config','save_config','decode_item','new_file',
     }) do
         a.equal(type(native[name]), 'function', 'native adapter missing method: ' .. name)
     end
@@ -192,8 +197,18 @@ return function()
     a.equal(calls[#calls].args[2], 'input /echo hello',
         'bridged bind commands must not also be queued as raw Ashita commands')
 
+    -- Windower chat.input executes the command immediately. It must never merely populate
+    -- Ashita's input line via SetInputText.
     native.input('/ma Cure <me>')
-    a.equal(calls[#calls].name, 'input')
+    a.equal(calls[#calls].name, 'queue')
+    a.equal(calls[#calls].args[1], 1,
+        'windower.chat.input must use Ashita typed-command execution mode')
+    a.equal(calls[#calls].args[2], '/ma Cure <me>')
+
+    native.execute_script('profiles/WAR_SAM_Tester')
+    a.equal(calls[#calls].name, 'script')
+    a.deep_equal(calls[#calls].args, {'profiles/WAR_SAM_Tester','',false},
+        'Windower exec compatibility must use pinned Ashita ExecuteScript')
 
     a.deep_equal(native.window_settings(), {ui_x_res=1920, ui_y_res=1080})
     a.equal(native.wc_match('Aftermath: Lv.3', 'Aftermath*'), true)
@@ -246,6 +261,17 @@ return function()
     a.equal(type(calls[#calls].args[2]), 'table')
     a.equal(calls[#calls].args[2][1], 0xF1)
     a.equal(calls[#calls].args[2][5], 15)
+
+    -- Ashita's pinned debuff addon cancels a status with outgoing packet 0xF1 and the buff
+    -- id as little-endian uint16 at bytes 5/6. Reuse that exact primitive for Windower
+    -- 'cancel <id>' instead of depending on an optional addon.
+    native.cancel_buff(71)
+    a.equal(calls[#calls].name, 'packet')
+    a.equal(calls[#calls].args[1], 0xF1)
+    a.equal(calls[#calls].args[2][1], 0xF1)
+    a.equal(calls[#calls].args[2][2], 0x04)
+    a.equal(calls[#calls].args[2][5], 71)
+    a.equal(calls[#calls].args[2][6], 0)
 
     local ran = false
     native.schedule(function() ran=true end, 2.5)
