@@ -9,6 +9,7 @@ local suites = {
     lac_data = {'tests.ashita.test_lac_data'},
     equip_backend = {'tests.ashita.test_equip_backend'},
     action_runtime = {'tests.ashita.test_action_runtime'},
+    pet_runtime = {'tests.ashita.test_pet_runtime'},
     bootstrap = {'tests.ashita.test_bootstrap'},
     state_runtime = {'tests.ashita.test_state_runtime'},
     phase2_audit = {'tests.ashita.test_phase2_audit_contracts'},
@@ -45,8 +46,9 @@ local suites = {
     wave2 = {'windower_unpack', 'lac_data', 'bootstrap', 'production_composition'},
     wave3 = {'upstream_load', 'production_composition'},
     wave4 = {'state_runtime', 'production_composition'},
+    wave5 = {'lac_data', 'pet_runtime', 'bootstrap', 'production_composition'},
 }
-suites.all = {'baseline', 'compat_sets', 'modes', 'include', 'phase1_primitives', 'windower_unpack', 'snapshot', 'lac_data', 'equip_backend', 'action_runtime', 'bootstrap', 'state_runtime', 'phase2_audit', 'events', 'scheduler', 'scheduler_lifecycle', 'packets', 'packet_decoder', 'th_parity', 'ipc', 'ipc_clock', 'platform', 'native', 'resources', 'extdata', 'platform_windower', 'runtime_events', 'lifecycle_runtime_events', 'spellreceived_parity', 'inventory', 'enchant_hoxne', 'settings', 'commands', 'keybinds', 'display', 'texts_renderer', 'lifecycle', 'runtime_integration', 'production_composition', 'profile_production', 'upstream_load', 'audit_contracts', 'parity_core'}
+suites.all = {'baseline', 'compat_sets', 'modes', 'include', 'phase1_primitives', 'windower_unpack', 'snapshot', 'lac_data', 'equip_backend', 'action_runtime', 'pet_runtime', 'bootstrap', 'state_runtime', 'phase2_audit', 'events', 'scheduler', 'scheduler_lifecycle', 'packets', 'packet_decoder', 'th_parity', 'ipc', 'ipc_clock', 'platform', 'native', 'resources', 'extdata', 'platform_windower', 'runtime_events', 'lifecycle_runtime_events', 'spellreceived_parity', 'inventory', 'enchant_hoxne', 'settings', 'commands', 'keybinds', 'display', 'texts_renderer', 'lifecycle', 'runtime_integration', 'production_composition', 'profile_production', 'upstream_load', 'audit_contracts', 'parity_core'}
 local requested = arg[1] or 'all'
 local failures, passes = 0, 0
 local function run(name)
