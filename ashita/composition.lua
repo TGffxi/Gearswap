@@ -3,6 +3,8 @@ local runtime_events_module = require('ashita.runtime_events')
 local lifecycle_module = require('ashita.lifecycle')
 local action_runtime_module = require('ashita.action_runtime')
 local pet_runtime_module = require('ashita.pet_runtime')
+local command_runtime_module = require('ashita.command_runtime')
+local validate_module = require('ashita.validate')
 local state_runtime_module = require('ashita.state_runtime')
 local equip_backend_module = require('ashita.equip_backend')
 local bootstrap = require('ashita.bootstrap')
@@ -150,6 +152,44 @@ function M.new(deps)
     })
 
     local env = environment.new(platform)
+
+    -- Install Windower command-language compatibility before the job file is included.
+    -- Every shipped sample calls jobsetup() at file scope, so its wait/input/validate/self
+    -- chain must already be routable while env.include(job_path) is still executing.
+    local command_runtime = command_runtime_module.new({
+        schedule=function(fn, delay) return scheduler.schedule(fn, delay) end,
+        input=function(command)
+            local fn = native_facade.input
+            if type(fn) ~= 'function' then error('RahvinCompatError:native.input', 2) end
+            return fn(command)
+        end,
+        raw_command=function(command)
+            local fn = native_facade.send_command
+            if type(fn) ~= 'function' then error('RahvinCompatError:native.send_command', 2) end
+            return fn(command)
+        end,
+        cancel_buff=function(id)
+            local fn = native_facade.cancel_buff
+            if type(fn) ~= 'function' then error('RahvinCompatError:native.cancel_buff', 2) end
+            return fn(id)
+        end,
+        execute_script=function(path)
+            local fn = native_facade.execute_script
+            if type(fn) ~= 'function' then error('RahvinCompatError:native.execute_script', 2) end
+            return fn(path)
+        end,
+        self_command=function(command)
+            return invoke_env(env, 'self_command', command)
+        end,
+        validate=function(args)
+            return validate_module.validate(env, platform, args)
+        end,
+    })
+
+    platform.send_command = function(_, command)
+        return command_runtime:send(command)
+    end
+
     environment.install_runtime(env, platform)
     gearswap.install(env, backend)
     env.windower = windower.new(platform)
@@ -298,6 +338,7 @@ function M.new(deps)
         engine=engine,
         action_runtime=action_runtime,
         pet_runtime=pet_runtime,
+        command_runtime=command_runtime,
         state_runtime=state_runtime,
         lifecycle=lifecycle,
         settings=deps.settings or {},
