@@ -222,8 +222,15 @@ return function()
     a.equal(mob.id, 3333)
     a.equal(mob.spawn_type, 16, 'Ashita monster spawn flag 17 maps to Windower 16')
     a.equal(mob.is_npc, true)
-    a.equal(mob.distance, 49)
-    a.equal(native.get_mob_by_id(3333).index, 200)
+    a.equal(type(mob.distance), 'table',
+        'Windower mob distance must preserve the :sqrt() surface Rahvin calls')
+    a.equal(mob.distance.squared, 49)
+    a.equal(mob.distance:sqrt(), 7,
+        'Ashita squared entity distance must expose Windower-compatible sqrt yalms')
+    local by_id = native.get_mob_by_id(3333)
+    a.equal(by_id.index, 200)
+    a.equal(by_id.distance:sqrt(), 7,
+        'get_mob_by_id and get_mob_by_index must expose the same distance contract')
     a.equal(native.get_mob_by_id(9999), nil)
 
     local me = native.get_player()
