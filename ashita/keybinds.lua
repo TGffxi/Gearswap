@@ -53,6 +53,19 @@ local function production_execute(command)
     return true
 end
 
+local bridged_held = {}
+
+local function bridge_run(execute, command)
+    local ok, result = pcall(execute, command)
+    if not ok then
+        error('RahvinCompatError:keybinds.bridge.execute:' .. tostring(result), 3)
+    end
+    if result == false then
+        error('RahvinCompatError:keybinds.bridge.execute:' .. command, 3)
+    end
+    return true
+end
+
 function M.bridge(command, execute)
     if type(command) ~= 'string' then
         error('RahvinCompatError:keybinds.bridge.command', 2)
@@ -68,7 +81,10 @@ function M.bridge(command, execute)
         if not valid_key(key) or key == '' then
             error('RahvinCompatError:keybinds.bridge.key:' .. tostring(key), 2)
         end
-        return execute('/bind ' .. ashita_key(key) .. ' /lac fwd ' .. forwarded)
+        local translated = ashita_key(key)
+        bridge_run(execute, '/bind ' .. translated .. ' /lac fwd ' .. forwarded)
+        bridged_held[translated] = true
+        return true
     end
 
     key = command:match('^%s*unbind%s+(%S+)%s*$')
@@ -77,10 +93,30 @@ function M.bridge(command, execute)
         if not valid_key(key) or key == '' then
             error('RahvinCompatError:keybinds.bridge.key:' .. tostring(key), 2)
         end
-        return execute('/unbind ' .. ashita_key(key))
+        local translated = ashita_key(key)
+        bridge_run(execute, '/unbind ' .. translated)
+        bridged_held[translated] = nil
+        return true
     end
 
     error('RahvinCompatError:keybinds.bridge.command:' .. command, 2)
+end
+
+function M.clear_bridged(execute)
+    execute = execute or production_execute
+    if type(execute) ~= 'function' then
+        error('RahvinCompatError:keybinds.bridge.executor', 2)
+    end
+
+    local keys = {}
+    for key in pairs(bridged_held) do keys[#keys + 1] = key end
+    table.sort(keys)
+
+    for _, key in ipairs(keys) do
+        bridge_run(execute, '/unbind ' .. key)
+        bridged_held[key] = nil
+    end
+    return true
 end
 
 function M.new(execute)
