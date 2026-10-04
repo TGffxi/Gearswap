@@ -232,12 +232,26 @@ return function()
     a.equal(type(graph.runtime_events), 'table', 'composition must build runtime events around the same platform')
     a.equal(type(graph.action_runtime), 'table')
     a.equal(type(graph.pet_runtime), 'table', 'production graph must own one pet runtime')
+    a.equal(type(graph.command_runtime), 'table', 'production graph must own one Windower command runtime')
     a.equal(type(graph.state_runtime), 'table')
     a.equal(type(graph.backend), 'table')
     a.equal(type(graph.env.pet_midaction), 'function',
         'GearSwap pet_midaction helper must be installed into Rahvin environment')
     a.equal(graph.env.pet_midaction(), false,
         'pet_midaction must start false before any LAC PetAction is observed')
+
+    -- Wave 6: both global send_command and windower.send_command must enter the same
+    -- compatibility grammar. Internal gs c commands dispatch directly back into Rahvin and
+    -- never escape as unknown commands to the native Ashita queue.
+    local wave6_self_commands = {}
+    local original_self_command = graph.env.self_command
+    graph.env.self_command = function(command)
+        wave6_self_commands[#wave6_self_commands + 1] = command
+    end
+    graph.env.windower.send_command('gs c update auto')
+    graph.env.send_command('gs c enchrepair')
+    a.deep_equal(wave6_self_commands, {'update auto','enchrepair'})
+    graph.env.self_command = original_self_command
 
     a.equal(graph.platform.resources, resources, 'composition must retain one production resource identity')
     a.equal(graph.env.require('resources').items, resources.items,
