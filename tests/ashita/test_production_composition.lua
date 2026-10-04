@@ -118,9 +118,10 @@ return function()
         Disable=function(slot) gfunc_calls[#gfunc_calls + 1] = {'Disable', slot}; return true end,
         CancelAction=function() gfunc_calls[#gfunc_calls + 1] = {'CancelAction'}; return true end,
     }
-    local current_action
+    local current_action, current_pet_action
     local gData = {
         GetAction=function() return current_action end,
+        GetPetAction=function() return current_pet_action end,
         GetActionTarget=function() return nil end,
         GetPlayer=function() return {Name='Tester'} end,
     }
@@ -230,8 +231,13 @@ return function()
     a.equal(type(graph.lifecycle), 'table', 'composition must build lifecycle around the same graph')
     a.equal(type(graph.runtime_events), 'table', 'composition must build runtime events around the same platform')
     a.equal(type(graph.action_runtime), 'table')
+    a.equal(type(graph.pet_runtime), 'table', 'production graph must own one pet runtime')
     a.equal(type(graph.state_runtime), 'table')
     a.equal(type(graph.backend), 'table')
+    a.equal(type(graph.env.pet_midaction), 'function',
+        'GearSwap pet_midaction helper must be installed into Rahvin environment')
+    a.equal(graph.env.pet_midaction(), false,
+        'pet_midaction must start false before any LAC PetAction is observed')
 
     a.equal(graph.platform.resources, resources, 'composition must retain one production resource identity')
     a.equal(graph.env.require('resources').items, resources.items,
@@ -328,6 +334,27 @@ return function()
     a.equal(#scheduled, scheduled_before_subjob + 3,
         'identical subjob snapshot must not schedule duplicate refresh work')
     graph.env.sub_job_change_custom = nil
+
+    -- Wave 5: GearSwap pet_midaction() must reflect the exact shared PetAction runtime used
+    -- by HandleDefault. The helper also returns the current normalized pet spell as GearSwap
+    -- does, so Rahvin and job hooks see one identity.
+    current_pet_action={
+        ActionType='Ability', Name='Predator Claws', Id=173, Type='Blood Pact: Rage',
+    }
+    graph.profile.HandleDefault()
+    local pet_active, pet_spell = graph.env.pet_midaction()
+    a.equal(pet_active, true)
+    a.equal(pet_spell.name, 'Predator Claws')
+    a.equal(pet_spell.prefix, '/pet')
+    graph.profile.HandleDefault()
+    local pet_active_again = graph.env.pet_midaction()
+    a.equal(pet_active_again, true,
+        'repeated default tick must retain the same active pet generation')
+
+    current_pet_action=nil
+    graph.profile.HandleDefault()
+    a.equal(graph.env.pet_midaction(), false,
+        'pet_midaction must clear on the same edge that fires pet_aftercast')
 
     -- GearSwap cancellation is action-scoped state, not only a low-level LAC primitive.
     -- cancel_spell() must expose the flag to Rahvin in the same pretarget/precast scope, and
