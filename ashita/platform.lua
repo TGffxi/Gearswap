@@ -55,7 +55,8 @@ function M.new(deps)
     -- stable surface; if composition omitted a capability, fail at the call site instead
     -- of silently pretending the Windower operation succeeded.
     local native_methods = {
-        'chat', 'send_command', 'input', 'window_settings', 'wc_match', 'get_info',
+        'chat', 'send_command', 'input', 'cancel_buff', 'execute_script',
+        'window_settings', 'wc_match', 'get_info',
         'get_abilities', 'get_party', 'get_mob_by_id', 'get_mob_by_index', 'get_player',
         'inject_outgoing', 'schedule', 'gettime', 'load_config', 'save_config',
         'decode_item', 'new_file',
