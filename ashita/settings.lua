@@ -151,10 +151,38 @@ function M.new(fs, base)
             pcall(fs.remove, temp)
             return false
         end
-        if fs.rename(temp, path) == false then
+        if fs.rename(temp, path) ~= false then
+            return true
+        end
+
+        -- Some Windows/Ashita file-system implementations refuse rename(temp, final) while
+        -- final already exists. Preserve the last valid file until the replacement is ready:
+        -- move it aside, install the fully-written temp file, then delete the backup. If the
+        -- install fails, restore the backup before returning failure.
+        if not fs.exists(path) then
             pcall(fs.remove, temp)
             return false
         end
+
+        tmp_sequence = tmp_sequence + 1
+        local backup = path .. '.bak.' .. tostring(tmp_sequence)
+        pcall(fs.remove, backup)
+
+        if fs.rename(path, backup) == false then
+            pcall(fs.remove, temp)
+            return false
+        end
+
+        if fs.rename(temp, path) == false then
+            local restored = fs.rename(backup, path)
+            pcall(fs.remove, temp)
+            if restored ~= false then
+                pcall(fs.remove, backup)
+            end
+            return false
+        end
+
+        pcall(fs.remove, backup)
         return true
     end
 
