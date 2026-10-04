@@ -54,10 +54,10 @@ return function()
     a.equal(service.load({Keybinds={}}), true)
     a.equal(type(registered['d3d_present:rahvings_runtime_tick']), 'function',
         'runtime frame event must be bound')
-    local logout = registered['logout:rahvings_runtime_logout']
-    a.equal(type(logout), 'function', 'Ashita logout event must call lifecycle.logout')
+    a.equal(registered['logout:rahvings_runtime_logout'], nil,
+        'Ashita v4 has no native logout event; packet_in 0x00B owns logout detection')
 
-    logout()
-    a.equal(service.is_running(), false, 'logout event must stop the runtime')
-    a.equal(closed, 1, 'logout event must close the active IPC transport')
+    a.equal(service.logout(), true)
+    a.equal(service.is_running(), false, 'lifecycle logout must stop the runtime')
+    a.equal(closed, 1, 'lifecycle logout must close the active IPC transport')
 end
