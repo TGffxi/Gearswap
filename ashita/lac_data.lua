@@ -1,9 +1,9 @@
 local M = {}
 
 local action_types = {
-    Spell={'Magic', nil}, Weaponskill={'Ability', 'WeaponSkill'},
-    Ability={'Ability', nil}, Ranged={'Ranged Attack', 'Ranged Attack'},
-    Item={'Item', 'Item'},
+    Spell={'Magic', nil, '/magic'}, Weaponskill={'Ability', 'WeaponSkill', '/weaponskill'},
+    Ability={'Ability', nil, '/jobability'}, Ranged={'Ranged Attack', 'Ranged Attack', '/range'},
+    Item={'Item', 'Item', '/item'},
 }
 local spell_types = {['White Magic']='WhiteMagic', ['Black Magic']='BlackMagic',
     Summoning='SummonerPact', ['Bard Song']='BardSong', ['Blue Magic']='BlueMagic'}
@@ -75,7 +75,8 @@ function M.action(gData)
     local player = get(gData, 'GetPlayer')
     return {
         english=value.Name, name=value.Name, id=value.Id, action_type=kind[1],
-        type=rahvin_type, skill=value.Skill, element=value.Element,
+        type=rahvin_type, prefix=kind[3], skill=value.Skill,
+        skill_id=resource and resource.Skill or nil, element=value.Element,
         element_id=resource and resource.Element or nil,
         cast_time=value.CastTime, recast=value.Recast, recast_id=recast_id,
         target=entity(get(gData, 'GetActionTarget'), player and player.Name or nil),
