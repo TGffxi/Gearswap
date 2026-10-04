@@ -122,6 +122,7 @@ function M.new(deps)
 
     local backend = equip_backend_module.new(gFunc)
     local capture_snapshot
+    local event_modes = {}
 
     local platform = platform_module.new({
         native=native_facade,
@@ -132,6 +133,7 @@ function M.new(deps)
         on_event_begin=function(mode)
             -- No GearSwap equip buffer may cross a logical event boundary. Wrapped events
             -- additionally refresh the user-facing globals once before their handlers.
+            event_modes[#event_modes + 1] = mode
             backend:discard()
             if mode == 'wrapped' then
                 if type(capture_snapshot) ~= 'function' then
@@ -148,6 +150,7 @@ function M.new(deps)
             else
                 backend:discard()
             end
+            event_modes[#event_modes] = nil
         end,
     })
 
@@ -179,7 +182,18 @@ function M.new(deps)
             return fn(path)
         end,
         self_command=function(command)
-            return invoke_env(env, 'self_command', command)
+            local function dispatch()
+                local result = invoke_env(env, 'self_command', command)
+                backend:flush()
+                return result
+            end
+            -- Windower send_command queues a GearSwap command outside the raw callback that
+            -- emitted it. Preserve that escape hatch (used by Hoxne relock/release) without
+            -- introducing another timer owner: schedule it on the existing shared queue.
+            if event_modes[#event_modes] == 'raw' then
+                return scheduler.schedule(dispatch, 0)
+            end
+            return dispatch()
         end,
         validate=function(args)
             return validate_module.validate(env, platform, args)
