@@ -122,6 +122,13 @@ return function()
     box:text('Classic')
     a.equal(box:text(), 'Classic')
     a.equal(font.text, 'Classic')
+
+    local colored = '\\cs(150,150,150)STN\\cr \\cs(80,220,110)DT\\cr'
+    box:text(colored)
+    a.equal(box:text(), colored,
+        'Windower texts getter must preserve the Rahvin-facing source string')
+    a.equal(font.text, '|cFF969696|STN|r |cFF50DC6E|DT|r',
+        'Windower inline RGB tags must be translated to Ashita font inline colors')
     local ew, eh = box:extents()
     a.equal(ew, 123); a.equal(eh, 45)
 
