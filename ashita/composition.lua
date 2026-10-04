@@ -218,13 +218,20 @@ function M.new(deps)
     local action_runtime = action_runtime_module.new(engine, deps.clock)
     local state_runtime = state_runtime_module.new(engine)
 
+    local lifecycle
     local runtime_events = runtime_events_module.new({
         events=events,
         platform=platform,
         decoder=deps.decoder,
+        on_logout=function()
+            if lifecycle == nil then
+                error('RahvinCompatError:composition.logout_before_lifecycle', 2)
+            end
+            return lifecycle.logout()
+        end,
     })
 
-    local lifecycle = lifecycle_module.new({
+    lifecycle = lifecycle_module.new({
         events=events,
         scheduler=scheduler,
         ipc_factory=need(deps.ipc_factory, 'ipc_factory'),
