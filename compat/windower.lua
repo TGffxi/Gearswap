@@ -11,7 +11,7 @@ function M.new(platform)
     local w = {
         add_to_chat=required(platform, 'chat'), send_command=required(platform, 'send_command'),
         send_ipc_message=required(platform, 'send_ipc'), register_event=required(platform, 'register_event'),
-        raw_register_event=required(platform, 'register_event'), get_windower_settings=required(platform, 'window_settings'),
+        raw_register_event=required(platform, 'raw_register_event'), get_windower_settings=required(platform, 'window_settings'),
         wc_match=required(platform, 'wc_match'),
         chat={input=required(platform, 'input')},
         ffxi={
