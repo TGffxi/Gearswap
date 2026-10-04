@@ -204,7 +204,10 @@ function M.new(deps)
         return invoke_env(env, 'status_change', status, status)
     end
 
-    engine.pretarget = function(action) return invoke_env(env, 'pretarget', action) end
+    engine.pretarget = function(action)
+        env._global.cancel_spell = false
+        return invoke_env(env, 'pretarget', action)
+    end
     engine.precast = function(action) return invoke_env(env, 'precast', action) end
     engine.midcast = function(action) return invoke_env(env, 'midcast', action) end
     engine.preshot = function(action) return invoke_env(env, 'precast', action) end
