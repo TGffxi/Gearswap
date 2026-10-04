@@ -19,21 +19,28 @@ end
 return function()
     local cases = {
         {{ActionType='Spell', Name='Fire', Id=144, Type='Black Magic', Skill='Elemental Magic', Element='Fire',
-            CastTime=2000, Recast=8000, Resource={Index=144,Type=2,Element=0}}, 'Magic', 'BlackMagic'},
-        {{ActionType='Weaponskill', Name='Savage Blade', Id=42}, 'Ability', 'WeaponSkill'},
-        {{ActionType='Ability', Name='Provoke', Id=5, Type='Unknown', Resource={RecastTimerId=1}}, 'Ability', 'JobAbility'},
-        {{ActionType='Ranged', Name='Ranged', Id=0}, 'Ranged Attack', 'Ranged Attack'},
-        {{ActionType='Item', Name='Echo Drops', Id=100, CastTime=1000, Recast=0}, 'Item', 'Item'},
+            CastTime=2000, Recast=8000, Resource={Index=144,Type=2,Element=0,Skill=36}},
+            'Magic', 'BlackMagic', '/magic'},
+        {{ActionType='Weaponskill', Name='Savage Blade', Id=42},
+            'Ability', 'WeaponSkill', '/weaponskill'},
+        {{ActionType='Ability', Name='Provoke', Id=5, Type='Unknown', Resource={RecastTimerId=1}},
+            'Ability', 'JobAbility', '/jobability'},
+        {{ActionType='Ranged', Name='Ranged', Id=0},
+            'Ranged Attack', 'Ranged Attack', '/range'},
+        {{ActionType='Item', Name='Echo Drops', Id=100, CastTime=1000, Recast=0},
+            'Item', 'Item', '/item'},
     }
     for _, case in ipairs(cases) do
         local got = lac_data.action(provider(case[1]))
         a.equal(got.action_type, case[2]); a.equal(got.type, case[3])
+        a.equal(got.prefix, case[4], 'GearSwap action prefix must be preserved for ' .. case[1].ActionType)
         a.equal(got.name, case[1].Name); a.equal(got.english, case[1].Name); a.equal(got.id, case[1].Id)
         a.equal(got.target.id, 99); a.equal(got.target.index, 7); a.equal(got.target.name, 'Target')
         a.equal(got.target.distance, 4.5); a.equal(got.target.status, 'Engaged')
     end
     local spell = lac_data.action(provider(cases[1][1]))
     a.equal(spell.element, 'Fire'); a.equal(spell.element_id, 0); a.equal(spell.skill, 'Elemental Magic'); a.equal(spell.recast_id, 144)
+    a.equal(spell.skill_id, 36, 'GearSwap numeric skill_id must come from the pinned LAC spell resource')
     a.equal(lac_data.action(provider({ActionType='Ability',Name='Light Shot',Id=1,Type='Quick Draw'})).type,'CorsairShot')
     a.equal(lac_data.action(provider({ActionType='Spell',Name='Cure',Id=1,Type='White Magic'})).type,'WhiteMagic')
     a.equal(lac_data.action(provider(nil)), nil)
