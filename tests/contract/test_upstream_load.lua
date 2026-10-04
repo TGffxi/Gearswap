@@ -7,7 +7,14 @@ return function()
     local platform = {
         resources={elements={}, items={}, buffs={}, job_abilities={}, weapon_skills={}, spells={}, zones={}, bags={}, jobs={}},
         chat=function() end, send_command=function() end, send_ipc=function() end, input=function() end,
-        register_event=function(_, name, fn) events[#events+1]={name=name,fn=fn}; return #events end,
+        register_event=function(_, name, fn)
+            events[#events+1]={name=name,fn=fn,mode='wrapped'}
+            return #events
+        end,
+        raw_register_event=function(_, name, fn)
+            events[#events+1]={name=name,fn=fn,mode='raw'}
+            return #events
+        end,
         schedule=function(_, fn, delay) scheduled[#scheduled+1]={fn=fn,delay=delay} end,
         get_info=function() return {language='english', logged_in=true} end,
         get_items=function() return {max=0} end, get_abilities=function() return {job_traits={}} end,
@@ -38,5 +45,30 @@ return function()
     a.equal(env.Rahvin_GS, '2.1')
     env.include('RahvinGS/Rahvin-Engine')
     a.equal(type(env.precast), 'function'); a.equal(#events > 0, true); a.equal(#scheduled, 11)
+
+    -- The unchanged Rahvin root deliberately chooses GearSwap wrapped/raw registration per
+    -- event.  Preserve that choice across the compatibility boundary instead of collapsing
+    -- both APIs into one platform registration.
+    local modes = {}
+    for _, event in ipairs(events) do
+        modes[event.name] = modes[event.name] or {}
+        modes[event.name][event.mode] = (modes[event.name][event.mode] or 0) + 1
+    end
+    for _, name in ipairs({'target change','ipc message','gain buff','lose buff','addon command'}) do
+        a.equal(modes[name] and modes[name].wrapped or 0, 1,
+            name .. ' must retain Rahvin wrapped-event registration')
+        a.equal(modes[name] and modes[name].raw or 0, 0,
+            name .. ' must not be collapsed into raw registration')
+    end
+    for _, name in ipairs({'incoming chunk','outgoing chunk','zone change','action','logout'}) do
+        a.equal(modes[name] and modes[name].raw or 0, 1,
+            name .. ' must retain Rahvin raw-event registration')
+        a.equal(modes[name] and modes[name].wrapped or 0, 0,
+            name .. ' must not be collapsed into wrapped registration')
+    end
+    a.equal(modes.prerender and modes.prerender.raw or 0, 2,
+        'both Rahvin prerender drivers must retain raw registration')
+    a.equal(modes.prerender and modes.prerender.wrapped or 0, 0)
+
     a.raises(function() windower.new({}).send_command('x') end, 'RahvinCompatError:windower.send_command')
 end
