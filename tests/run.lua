@@ -33,6 +33,7 @@ local suites = {
     inventory = {'tests.ashita.test_inventory'},
     enchant_hoxne = {'tests.parity.test_enchant_hoxne'},
     settings = {'tests.ashita.test_settings'},
+    settings_refusal = {'tests.parity.test_settings_refusal'},
     commands = {'tests.parity.test_commands'},
     keybinds = {'tests.ashita.test_keybinds'},
     display = {'tests.ashita.test_display'},
@@ -49,8 +50,9 @@ local suites = {
     wave4 = {'state_runtime', 'production_composition'},
     wave5 = {'lac_data', 'pet_runtime', 'bootstrap', 'production_composition'},
     wave6 = {'native', 'command_runtime', 'production_composition', 'commands'},
+    wave7 = {'settings', 'settings_refusal'},
 }
-suites.all = {'baseline', 'compat_sets', 'modes', 'include', 'phase1_primitives', 'windower_unpack', 'snapshot', 'lac_data', 'equip_backend', 'action_runtime', 'pet_runtime', 'command_runtime', 'bootstrap', 'state_runtime', 'phase2_audit', 'events', 'scheduler', 'scheduler_lifecycle', 'packets', 'packet_decoder', 'th_parity', 'ipc', 'ipc_clock', 'platform', 'native', 'resources', 'extdata', 'platform_windower', 'runtime_events', 'lifecycle_runtime_events', 'spellreceived_parity', 'inventory', 'enchant_hoxne', 'settings', 'commands', 'keybinds', 'display', 'texts_renderer', 'lifecycle', 'runtime_integration', 'production_composition', 'profile_production', 'upstream_load', 'audit_contracts', 'parity_core'}
+suites.all = {'baseline', 'compat_sets', 'modes', 'include', 'phase1_primitives', 'windower_unpack', 'snapshot', 'lac_data', 'equip_backend', 'action_runtime', 'pet_runtime', 'command_runtime', 'bootstrap', 'state_runtime', 'phase2_audit', 'events', 'scheduler', 'scheduler_lifecycle', 'packets', 'packet_decoder', 'th_parity', 'ipc', 'ipc_clock', 'platform', 'native', 'resources', 'extdata', 'platform_windower', 'runtime_events', 'lifecycle_runtime_events', 'spellreceived_parity', 'inventory', 'enchant_hoxne', 'settings', 'settings_refusal', 'commands', 'keybinds', 'display', 'texts_renderer', 'lifecycle', 'runtime_integration', 'production_composition', 'profile_production', 'upstream_load', 'audit_contracts', 'parity_core'}
 local requested = arg[1] or 'all'
 local failures, passes = 0, 0
 local function run(name)
