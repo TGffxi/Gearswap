@@ -1,5 +1,5 @@
 local slots = require('compat.slots')
-local sets = require('compat.sets')
+local items = require('compat.item_normalizer')
 local M = {}
 local methods = {}
 methods.__index = methods
@@ -16,7 +16,7 @@ end
 
 function methods:equip(set)
     if type(set) ~= 'table' then error('RahvinCompatError:equip_set', 2) end
-    for slot, item in pairs(set) do self.pending[slots.to_lac(slot)] = sets.copy(item) end
+    for slot, item in pairs(set) do self.pending[slots.to_lac(slot)] = items.normalize(item) end
 end
 
 function methods:enable(slot) return call(self, 'Enable', slots.to_lac(slot)) end
