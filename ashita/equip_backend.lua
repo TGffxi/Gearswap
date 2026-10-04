@@ -31,4 +31,10 @@ function methods:flush()
     return true
 end
 
+function methods:discard()
+    local had_pending = next(self.pending) ~= nil
+    self.pending = {}
+    return had_pending
+end
+
 return M
