@@ -24,6 +24,10 @@ function M.new(deps)
     require_method(platform, 'attach_ipc', 'platform.attach_ipc')
     require_method(platform, 'detach_ipc', 'platform.detach_ipc')
     require_method(platform, 'clear_events', 'platform.clear_events')
+    local on_logout = deps.on_logout
+    if type(on_logout) ~= 'function' then
+        error('RahvinCompatError:runtime_events.on_logout', 2)
+    end
 
     local bridge = packets.new({
         zone_change=function(new_zone, old_zone)
@@ -40,6 +44,9 @@ function M.new(deps)
         end,
         target_change=function(new_index, old_index)
             platform:emit('target change', new_index, old_index)
+        end,
+        logout=function()
+            return on_logout()
         end,
     }, deps.decoder)
 
