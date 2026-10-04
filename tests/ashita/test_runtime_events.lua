@@ -43,9 +43,16 @@ return function()
         action=function(e) return e.decoded_action end,
         zone=function(e) return e.new_zone, e.old_zone end,
         target_index=function() return target_index end,
+        logout=function(e) return e.is_logout == true end,
     }
 
-    local service = runtime_events.new({events=events, platform=platform, decoder=decoder})
+    local native_logouts = 0
+    local service = runtime_events.new({
+        events=events,
+        platform=platform,
+        decoder=decoder,
+        on_logout=function() native_logouts = native_logouts + 1; return true end,
+    })
     a.equal(type(service.register), 'function')
     a.equal(type(service.frame), 'function')
     a.equal(type(service.logout), 'function')
@@ -74,6 +81,13 @@ return function()
     incoming({id=0x00A, new_zone=291, old_zone=100})
     a.equal(emitted[#emitted].name, 'zone change')
     a.deep_equal(emitted[#emitted].args, {291,100})
+
+    local emitted_before_logout_packet = #emitted
+    incoming({id=0x00B, is_logout=true})
+    a.equal(native_logouts, 1,
+        'logout packet must invoke lifecycle ownership callback')
+    a.equal(#emitted, emitted_before_logout_packet,
+        'packet bridge must not emit Rahvin logical logout separately from lifecycle')
 
     outgoing({id=0x015, data='move-a', data_modified='move-a-mod', injected=false, blocked=false})
     a.equal(emitted[#emitted].name, 'outgoing chunk')
