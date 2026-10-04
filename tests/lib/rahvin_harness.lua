@@ -33,7 +33,14 @@ local function make_platform(opts)
         send_command=function() end,
         send_ipc=function() end,
         input=function() end,
-        register_event=function(_, name, fn) events[#events+1]={name=name,fn=fn}; return #events end,
+        register_event=function(_, name, fn)
+            events[#events+1]={name=name,fn=fn,mode='wrapped'}
+            return #events
+        end,
+        raw_register_event=function(_, name, fn)
+            events[#events+1]={name=name,fn=fn,mode='raw'}
+            return #events
+        end,
         schedule=function(_, fn, delay) scheduled[#scheduled+1]={fn=fn,delay=delay} end,
         get_info=function() return {language='english', logged_in=true} end,
         get_items=function() return {max=0} end,
