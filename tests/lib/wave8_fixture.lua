@@ -160,7 +160,7 @@ local function make_ipc(shared, generation)
     }
 end
 
-local function make_native(shared, generation, resources)
+local function make_native(shared, generation, resources, job)
     local primitive_seq=0
 
     local function send_command(command)
@@ -228,7 +228,7 @@ local function make_native(shared, generation, resources)
         get_mob_by_id=function() return nil end,
         get_mob_by_index=function() return nil end,
         get_player=function()
-            return {id=111,index=22,name='Tester',main_job='WAR',sub_job='SAM'}
+            return {id=111,index=22,name='Tester',main_job=job,sub_job='SAM'}
         end,
         inject_outgoing=function() return true end,
         schedule=function(fn,delay) return shared.scheduler.schedule(fn,delay) end,
@@ -284,7 +284,7 @@ function M.build(shared, job)
         }
     end
 
-    local native=make_native(shared,generation,resources)
+    local native=make_native(shared,generation,resources,job)
     local inventory={iter_bag=function() return {} end}
     local recasts={abilities=function() return {} end,spells=function() return {} end}
 
