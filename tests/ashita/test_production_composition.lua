@@ -118,8 +118,9 @@ return function()
         Disable=function(slot) gfunc_calls[#gfunc_calls + 1] = {'Disable', slot}; return true end,
         CancelAction=function() gfunc_calls[#gfunc_calls + 1] = {'CancelAction'}; return true end,
     }
+    local current_action
     local gData = {
-        GetAction=function() return nil end,
+        GetAction=function() return current_action end,
         GetActionTarget=function() return nil end,
         GetPlayer=function() return {Name='Tester'} end,
     }
@@ -271,6 +272,30 @@ return function()
     a.equal(command_registers, 1)
     a.equal(slot_releases, 1)
     a.equal(type(ipc_listener), 'function', 'lifecycle IPC generation must attach to the shared platform')
+
+    -- GearSwap cancellation is action-scoped state, not only a low-level LAC primitive.
+    -- cancel_spell() must expose the flag to Rahvin in the same pretarget/precast scope, and
+    -- a later action must begin with a fresh false flag rather than inheriting stale cancel.
+    graph.env._global.cancel_spell = false
+    graph.env.cancel_spell()
+    a.equal(graph.env._global.cancel_spell, true,
+        'cancel_spell must set GearSwap _global.cancel_spell for Rahvin to observe')
+    a.equal(gfunc_calls[#gfunc_calls][1], 'CancelAction',
+        'cancel_spell must still invoke the LuAshitacast cancel primitive')
+
+    graph.env._global.cancel_spell = true
+    local cancel_seen_at_pretarget
+    graph.env.pretarget_custom = function()
+        cancel_seen_at_pretarget = graph.env._global.cancel_spell
+    end
+    current_action={ActionType='Item',Name='Echo Drops',Id=100,Type='Item',
+        CastTime=1000,Recast=0,Resend=false}
+    graph.profile.HandleItem()
+    a.equal(cancel_seen_at_pretarget, false,
+        'a new player action must reset stale GearSwap cancel state before Rahvin pretarget')
+    current_action=nil
+    graph.profile.HandleDefault()
+    graph.env.pretarget_custom=nil
 
     local frame = native_handlers['d3d_present:rahvings_runtime_tick']
     a.equal(type(frame), 'function', 'composition lifecycle must own one native d3d frame handler')
