@@ -167,6 +167,31 @@ return function()
     a.equal(calls[#calls].args[1], -1)
     a.equal(calls[#calls].args[2], 'input /echo hello')
 
+    local bridged_commands = {}
+    local bridged_native = native_module.new({
+        core=core,
+        gData=gData,
+        scheduler=scheduler,
+        settings=settings_store,
+        resources=resources,
+        primitives=primitives,
+        viewport=function() return 1920, 1080 end,
+        clock=function() return 123.5 end,
+        decode_item=function(item) return {decoded=item} end,
+        keybind_command=function(command)
+            bridged_commands[#bridged_commands + 1] = command
+            return true
+        end,
+    })
+    bridged_native.send_command('bind ~f9 gs c WeaponMode')
+    bridged_native.send_command('unbind ~f9')
+    a.deep_equal(bridged_commands, {
+        'bind ~f9 gs c WeaponMode',
+        'unbind ~f9',
+    }, 'Rahvin bind/unbind commands must route through the Ashita keybind adapter')
+    a.equal(calls[#calls].args[2], 'input /echo hello',
+        'bridged bind commands must not also be queued as raw Ashita commands')
+
     native.input('/ma Cure <me>')
     a.equal(calls[#calls].name, 'input')
 
@@ -264,7 +289,7 @@ return function()
 
     local previous_core = rawget(_G, 'AshitaCore')
     local previous_gdata = rawget(_G, 'gData')
-    local module_names = {'ashita.settings','ashita.resources','ashita.extdata','primitives','d3d8','socket'}
+    local module_names = {'ashita.settings','ashita.resources','ashita.extdata','ashita.keybinds','primitives','d3d8','socket'}
     local previous_loaded, previous_preload = {}, {}
     for _, name in ipairs(module_names) do
         previous_loaded[name] = package.loaded[name]
@@ -324,7 +349,17 @@ return function()
     rawset(_G, 'AshitaCore', core)
     rawset(_G, 'gData', gData)
 
+    local production_keybind_commands = {}
+    package.loaded['ashita.keybinds'] = {
+        bridge=function(command)
+            production_keybind_commands[#production_keybind_commands + 1] = command
+            return true
+        end,
+    }
     local production_native = native_module.production({scheduler=scheduler})
+    production_native.send_command('bind ^f12 gs c OffenseMode')
+    a.deep_equal(production_keybind_commands, {'bind ^f12 gs c OffenseMode'},
+        'production native builder must route Rahvin keybind ownership through ashita.keybinds')
     a.equal(resource_builds, 1, 'production native builder must build Ashita resources once')
     a.equal(production_native.resources, production_resources,
         'production native adapter must expose the production resource identity')
