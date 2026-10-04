@@ -13,8 +13,9 @@ return function()
     a.equal(packets.IDS.ZONE, 0x00A)
     a.equal(packets.IDS.ACTION, 0x028)
     a.equal(packets.IDS.ACTION_MESSAGE, 0x029)
+    a.equal(packets.IDS.LOGOUT, 0x00B)
 
-    local calls = {zone={}, incoming={}, action={}, poll={}, target={}}
+    local calls = {zone={}, incoming={}, action={}, poll={}, target={}, logout=0}
     local target_index = 41
     local handlers = {
         zone_change=function(new_zone, old_zone)
@@ -32,11 +33,15 @@ return function()
         target_change=function(new_index, old_index)
             calls.target[#calls.target+1] = {new_index, old_index}
         end,
+        logout=function()
+            calls.logout = calls.logout + 1
+        end,
     }
     local decoder = {
         zone=function(e) return e.new_zone, e.old_zone end,
         action=function(e) return e.decoded_action end,
         target_index=function() return target_index end,
+        logout=function(e) return e.is_logout == true end,
     }
     local service = packets.new(handlers, decoder)
 
@@ -52,6 +57,12 @@ return function()
 
     a.equal(service.on_incoming({id=packets.IDS.ZONE,new_zone=300,old_zone=299}), true)
     a.deep_equal(calls.zone[1], {300,299}, 'zone packet routes reset before later target polling')
+
+    a.equal(service.on_incoming({id=packets.IDS.LOGOUT,is_logout=false}), false,
+        'ordinary 0x00B zone-exit traffic must not synthesize logout')
+    a.equal(service.on_incoming({id=packets.IDS.LOGOUT,is_logout=true}), true)
+    a.equal(calls.logout, 1,
+        'Ashita logout-flagged 0x00B must reach the lifecycle logout bridge exactly once')
 
     service.on_outgoing({id=0x01A})
     a.deep_equal(calls.poll, {0x01A}, 'every outgoing packet drives Rahvin polling engine')
