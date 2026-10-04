@@ -78,7 +78,8 @@ local function serialize(value)
 end
 
 local function decode(raw)
-    if type(raw) ~= 'string' or raw == '' then return nil end
+    if type(raw) ~= 'string' then return nil, 'settings file could not be read' end
+    if raw == '' then return nil, 'settings file is empty' end
     local loader = loadstring or load
     local chunk, err = loader(raw, '@rahvings/settings.lua')
     if not chunk then return nil, err end
@@ -117,6 +118,7 @@ function M.new(fs, base)
     base = strip_trailing(base)
     local sep = separator_for(base)
     local store = {}
+    local refused = {}
 
     function store.path(identity)
         if type(identity) ~= 'table' then error('RahvinCompatError:settings.identity', 2) end
@@ -128,17 +130,149 @@ function M.new(fs, base)
     function store.load(identity, defaults)
         defaults = type(defaults) == 'table' and defaults or {}
         local path = store.path(identity)
-        if not fs.exists(path) then return copy(defaults) end
+
+        -- A missing source is a clean first-run/recovery state.  This is deliberately the
+        -- only way, besides a successfully decoded reload, to clear a prior refusal.
+        if not fs.exists(path) then
+            refused[path] = nil
+            return copy(defaults)
+        end
+
         local raw = fs.read(path)
-        local saved = decode(raw)
-        if type(saved) ~= 'table' then return copy(defaults) end
+        local saved, reason = decode(raw)
+        if type(saved) ~= 'table' then
+            reason = tostring(reason or 'settings file could not be decoded')
+            local refusal = {path=path, reason=reason}
+            refused[path] = refusal
+            return copy(defaults), copy(refusal)
+        end
+
+        refused[path] = nil
         return merge(defaults, saved)
     end
 
     function store.save(identity, value)
         if type(value) ~= 'table' then error('RahvinCompatError:settings.value', 2) end
         local path = store.path(identity)
-        local directory = path:match('^(.*)[\\/][^\\/]+$')
+        if refused[path] ~= nil then return false end
+        local directory = path:match('^(.*)[\\/][^\\/]+        if not directory or fs.mkdirp(directory) == false then return false end
+
+        local ok, data = pcall(serialize, value)
+        if not ok then error(data, 2) end
+
+        tmp_sequence = tmp_sequence + 1
+        local temp = path .. '.tmp.' .. tostring(tmp_sequence)
+        pcall(fs.remove, temp)
+        if fs.write(temp, data) == false then
+            pcall(fs.remove, temp)
+            return false
+        end
+        if fs.rename(temp, path) ~= false then
+            return true
+        end
+
+        -- Some Windows/Ashita file-system implementations refuse rename(temp, final) while
+        -- final already exists. Preserve the last valid file until the replacement is ready:
+        -- move it aside, install the fully-written temp file, then delete the backup. If the
+        -- install fails, restore the backup before returning failure.
+        if not fs.exists(path) then
+            pcall(fs.remove, temp)
+            return false
+        end
+
+        tmp_sequence = tmp_sequence + 1
+        local backup = path .. '.bak.' .. tostring(tmp_sequence)
+        pcall(fs.remove, backup)
+
+        if fs.rename(path, backup) == false then
+            pcall(fs.remove, temp)
+            return false
+        end
+
+        if fs.rename(temp, path) == false then
+            local restored = fs.rename(backup, path)
+            pcall(fs.remove, temp)
+            if restored ~= false then
+                pcall(fs.remove, backup)
+            end
+            return false
+        end
+
+        pcall(fs.remove, backup)
+        return true
+    end
+
+    return store
+end
+
+local function production_fs()
+    local root = rawget(_G, 'ashita')
+    local afs = root and root.fs
+    if type(afs) ~= 'table' or type(afs.exists) ~= 'function'
+        or type(afs.create_directory) ~= 'function' or type(afs.rename) ~= 'function'
+        or type(afs.remove) ~= 'function' then
+        error('RahvinCompatError:settings.ashita_fs', 3)
+    end
+
+    return {
+        exists=function(path) return afs.exists(path) end,
+        read=function(path)
+            local file = io.open(path, 'rb')
+            if not file then return nil end
+            local data = file:read('*a')
+            file:close()
+            return data
+        end,
+        mkdirp=function(path)
+            if afs.exists(path) then return true end
+            return afs.create_directory(path) ~= false
+        end,
+        write=function(path, data)
+            local file = io.open(path, 'wb')
+            if not file then return false end
+            local ok = file:write(data) ~= nil
+            file:flush()
+            file:close()
+            return ok
+        end,
+        rename=function(from, to) return afs.rename(from, to) ~= false end,
+        remove=function(path)
+            if not afs.exists(path) then return true end
+            return afs.remove(path) ~= false
+        end,
+    }
+end
+
+local default_store
+local function production_store()
+    if default_store then return default_store end
+    local core = rawget(_G, 'AshitaCore')
+    if not core or type(core.GetInstallPath) ~= 'function' then
+        error('RahvinCompatError:settings.install_path', 3)
+    end
+    local install = core:GetInstallPath()
+    if type(install) ~= 'string' or install == '' then
+        error('RahvinCompatError:settings.install_path', 3)
+    end
+    local base = strip_trailing(install) .. '\\config\\addons\\luashitacast'
+    default_store = M.new(production_fs(), base)
+    return default_store
+end
+
+function M.path(identity)
+    return production_store().path(identity)
+end
+
+function M.load(identity, defaults)
+    return production_store().load(identity, defaults)
+end
+
+function M.save(identity, value)
+    return production_store().save(identity, value)
+end
+
+return M
+)
         if not directory or fs.mkdirp(directory) == false then return false end
 
         local ok, data = pcall(serialize, value)
