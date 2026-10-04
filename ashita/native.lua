@@ -35,6 +35,23 @@ local function wildcard_pattern(value)
     return '^' .. value .. '$'
 end
 
+local distance_mt = {}
+distance_mt.__index = distance_mt
+
+function distance_mt:sqrt()
+    return math.sqrt(self.squared)
+end
+
+function distance_mt:__tostring()
+    return tostring(self.squared)
+end
+
+local function windower_distance(value)
+    value = tonumber(value) or 0
+    if value < 0 then value = 0 end
+    return setmetatable({squared=value}, distance_mt)
+end
+
 local function bytes_from_string(value)
     if type(value) == 'table' then return value end
     if type(value) ~= 'string' then
@@ -104,7 +121,8 @@ function M.new(deps)
         if id == 0 then return nil end
 
         local spawn = tonumber(method(entity, 'GetSpawnFlags', 'entity.GetSpawnFlags')(entity, index)) or 0
-        local distance = tonumber(method(entity, 'GetDistance', 'entity.GetDistance')(entity, index)) or 0
+        local distance = windower_distance(
+            method(entity, 'GetDistance', 'entity.GetDistance')(entity, index))
 
         return {
             id=id,
