@@ -14,6 +14,16 @@ local function argb(alpha, red, green, blue)
         + clamp_byte(blue)
 end
 
+local function render_text(value)
+    value = tostring(value or '')
+    value = value:gsub('\\cs%(%s*(%d+)%s*,%s*(%d+)%s*,%s*(%d+)%s*%)',
+        function(red, green, blue)
+            return ('|cFF%02X%02X%02X|'):format(
+                clamp_byte(red), clamp_byte(green), clamp_byte(blue))
+        end)
+    return value:gsub('\\cr', '|r')
+end
+
 local function ensure_config(cfg)
     cfg = cfg or {}
     cfg.text = cfg.text or {}
@@ -77,6 +87,7 @@ function M.new(fonts)
         local destroyed = false
         local drag_sequence = 0
         local drag_handlers = {}
+        local source_text = tostring(initial_text or '')
 
         local font = font_new({
             visible=false,
@@ -96,7 +107,7 @@ function M.new(fonts)
             padding=cfg.padding,
             position_x=cfg.pos.x,
             position_y=cfg.pos.y,
-            text=tostring(initial_text or ''),
+            text=render_text(source_text),
             background={
                 visible=false,
                 color=argb(cfg.bg.alpha, cfg.bg.red, cfg.bg.green, cfg.bg.blue),
@@ -325,9 +336,10 @@ function M.new(fonts)
         end
 
         function box:text(value)
-            if value == nil then return tostring(font.text or '') end
+            if value == nil then return source_text end
             if not alive() then return false end
-            font.text = tostring(value)
+            source_text = tostring(value)
+            font.text = render_text(source_text)
             return true
         end
 
