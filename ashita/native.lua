@@ -354,4 +354,79 @@ function M.new(deps)
     return native
 end
 
+local function load_module(name, label)
+    local ok, value = pcall(require, name)
+    if not ok then
+        error('RahvinCompatError:native.' .. label .. ':' .. tostring(value), 3)
+    end
+    return value
+end
+
+function M.production(deps)
+    deps = deps or {}
+
+    local core = deps.core or rawget(_G, 'AshitaCore')
+    if core == nil then error('RahvinCompatError:native.core', 2) end
+
+    local gData = deps.gData or rawget(_G, 'gData')
+    if type(gData) ~= 'table' then error('RahvinCompatError:native.gData', 2) end
+
+    local scheduler = need(deps.scheduler, 'scheduler')
+
+    local settings = deps.settings
+    if settings == nil then settings = load_module('ashita.settings', 'settings_module') end
+
+    local resources = deps.resources
+    if resources == nil then
+        local resources_module = load_module('ashita.resources', 'resources_module')
+        local production = method(resources_module, 'production', 'resources.production')
+        resources = production(core)
+    end
+
+    local primitives = deps.primitives
+    if primitives == nil then primitives = load_module('primitives', 'primitives_module') end
+
+    local d3d8 = deps.d3d8
+    if d3d8 == nil then d3d8 = load_module('d3d8', 'd3d8_module') end
+
+    local socket = deps.socket
+    if socket == nil then socket = load_module('socket', 'socket_module') end
+
+    local extdata = deps.extdata
+    if extdata == nil then extdata = load_module('ashita.extdata', 'extdata_module') end
+
+    local get_device = method(d3d8, 'get_device', 'd3d8.get_device')
+    local gettime = method(socket, 'gettime', 'socket.gettime')
+    local decode = method(extdata, 'decode', 'extdata.decode')
+
+    local function viewport()
+        local device = get_device()
+        if device == nil then error('RahvinCompatError:native.viewport_device', 3) end
+        local get_viewport = method(device, 'GetViewport', 'd3d8.GetViewport')
+        local result, value = get_viewport(device)
+        if tonumber(result) ~= 0 or value == nil then
+            error('RahvinCompatError:native.viewport', 3)
+        end
+        local width = tonumber(value.Width or value.width)
+        local height = tonumber(value.Height or value.height)
+        if width == nil or height == nil then
+            error('RahvinCompatError:native.viewport', 3)
+        end
+        return width, height
+    end
+
+    return M.new({
+        core=core,
+        gData=gData,
+        scheduler=scheduler,
+        settings=settings,
+        resources=resources,
+        primitives=primitives,
+        viewport=viewport,
+        clock=function() return gettime() end,
+        decode_item=function(item) return decode(item) end,
+        language=deps.language,
+    })
+end
+
 return M
