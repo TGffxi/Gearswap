@@ -148,11 +148,46 @@ return function()
             'successful replacement must not leave a backup settings file')
     end
 
+    -- Wave 7: an unreadable new Ashita settings file is a refused load, not an ordinary
+    -- first-run default. The session may run on copied defaults, but the store must preserve
+    -- the exact broken source and block every save for that identity until a later reload
+    -- observes that the file has actually been fixed or deleted.
     local corrupt_path = store.path(bob)
     fs._files[corrupt_path] = 'this is not valid lua settings data'
     local corrupt_before = fs._files[corrupt_path]
-    local recovered = store.load(bob, defaults)
-    a.deep_equal(recovered, defaults, 'corrupt settings must recover to defaults')
+    local ops_before_corrupt = #fs._ops
+
+    local recovered, refusal = store.load(bob, defaults)
+    a.deep_equal(recovered, defaults, 'corrupt settings must run on in-memory defaults')
+    a.equal(type(refusal), 'table', 'corrupt settings must surface a refusal record')
+    a.equal(refusal.path, corrupt_path, 'refusal must name the actual new Ashita settings file')
+    a.equal(type(refusal.reason), 'string')
+    a.equal(refusal.reason ~= '', true, 'refusal must include the parse/decode reason')
     a.equal(fs._files[corrupt_path], corrupt_before,
-        'loading corrupt settings must not silently overwrite/delete the original file')
+        'loading corrupt settings must preserve the original bytes')
+
+    a.equal(store.save(bob, {visible=false}), false,
+        'a refused identity must not save over its unreadable settings source')
+    a.equal(fs._files[corrupt_path], corrupt_before,
+        'refused save must leave the corrupt source byte-for-byte unchanged')
+    a.equal(#fs._ops, ops_before_corrupt,
+        'refused save must perform no mkdir/temp/write/rename/remove operations')
+
+    local recovered_again, refusal_again = store.load(bob, defaults)
+    a.deep_equal(recovered_again, defaults, 'repeated reload of corrupt source still uses defaults')
+    a.equal(refusal_again.path, corrupt_path)
+    a.equal(refusal_again.reason, refusal.reason,
+        'repeated corrupt reload must remain a stable refusal instead of becoming first-run defaults')
+    a.equal(store.save(bob, {visible=false}), false)
+    a.equal(fs._files[corrupt_path], corrupt_before)
+
+    -- Once the user fixes the source and reloads, refusal state may clear and saving becomes
+    -- legal again. This is the recovery boundary Rahvin's user-facing message promises.
+    fs._files[corrupt_path] = 'return { visible = false, Display_Style = "halo" }\n'
+    local repaired, repaired_refusal = store.load(bob, defaults)
+    a.equal(repaired.visible, false)
+    a.equal(repaired.Display_Style, 'halo')
+    a.equal(repaired_refusal, nil, 'valid reload must clear the prior refusal')
+    a.equal(store.save(bob, repaired), true,
+        'saving must resume only after a reload has observed a valid/fixed source')
 end
