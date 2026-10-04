@@ -43,6 +43,7 @@ local suites = {
     upstream_load = {'tests.contract.test_upstream_load'},
     audit_contracts = {'tests.contract.test_gearswap_slots', 'tests.contract.test_windower_surface'},
     wave2 = {'windower_unpack', 'lac_data', 'bootstrap', 'production_composition'},
+    wave3 = {'upstream_load', 'production_composition'},
 }
 suites.all = {'baseline', 'compat_sets', 'modes', 'include', 'phase1_primitives', 'windower_unpack', 'snapshot', 'lac_data', 'equip_backend', 'action_runtime', 'bootstrap', 'state_runtime', 'phase2_audit', 'events', 'scheduler', 'scheduler_lifecycle', 'packets', 'packet_decoder', 'th_parity', 'ipc', 'ipc_clock', 'platform', 'native', 'resources', 'extdata', 'platform_windower', 'runtime_events', 'lifecycle_runtime_events', 'spellreceived_parity', 'inventory', 'enchant_hoxne', 'settings', 'commands', 'keybinds', 'display', 'texts_renderer', 'lifecycle', 'runtime_integration', 'production_composition', 'profile_production', 'upstream_load', 'audit_contracts', 'parity_core'}
 local requested = arg[1] or 'all'
