@@ -13,6 +13,38 @@ return function()
     local first = {Name='Chirich Ring +1', Augment={'A','B'}, AugPath='A', AugRank=15,
         AugTrial=123, Bag='Wardrobe 2', Quantity=1}
     local second = {Name='Chirich Ring +1', Augment={'C'}, Bag='Wardrobe 3', Quantity=1}
+    local rahvin = {
+        name="Rosmerta's Cape",
+        priority=80,
+        augments={'HP+60', '"Fast Cast"+10'},
+        bag='wardrobe2',
+        AugPath='A',
+        AugRank=15,
+        AugTrial=123,
+    }
+    b:equip({back=rahvin})
+    b:flush()
+    local rahvin_set = calls.sets[#calls.sets]
+    a.equal(rahvin_set.Back.Name, rahvin.name,
+        'GearSwap lowercase name must normalize to LAC Name')
+    a.equal(rahvin_set.Back.Priority, rahvin.priority,
+        'GearSwap lowercase priority must normalize to LAC Priority')
+    a.deep_equal(rahvin_set.Back.Augment, rahvin.augments,
+        'GearSwap augments must normalize to LAC Augment')
+    a.equal(rahvin_set.Back.Bag, rahvin.bag,
+        'GearSwap lowercase bag must normalize to LAC Bag')
+    a.equal(rahvin_set.Back.AugPath, 'A')
+    a.equal(rahvin_set.Back.AugRank, 15)
+    a.equal(rahvin_set.Back.AugTrial, 123)
+    a.equal(rahvin_set.Back.name, nil,
+        'normalized LAC item must not depend on GearSwap lowercase name')
+    a.equal(rahvin_set.Back.priority, nil)
+    a.equal(rahvin_set.Back.augments, nil)
+    a.equal(rahvin_set.Back.bag, nil)
+
+    calls.sets = {}
+    b = backend.new(gFunc)
+
     b:equip({main='Naegling', left_ring=first, right_ring=second, head='Old'})
     b:equip({head='New', body={Name='Nyame Mail'}})
     a.equal(#calls.sets, 0)
