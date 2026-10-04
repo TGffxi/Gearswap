@@ -256,4 +256,93 @@ return function()
     a.raises(function() native.prim.set_visibility('missing', true) end,
         'RahvinCompatError:native.prim.missing',
         'missing primitive names must fail loudly')
+
+    -- Production builder: resolve the normal Ashita/LAC runtime instead of requiring a
+    -- hand-assembled dependency table from each LuAshitacast profile.
+    a.equal(type(native_module.production), 'function',
+        'native.production must expose the real Ashita/LAC dependency builder')
+
+    local previous_core = rawget(_G, 'AshitaCore')
+    local previous_gdata = rawget(_G, 'gData')
+    local module_names = {'ashita.settings','ashita.resources','ashita.extdata','primitives','d3d8','socket'}
+    local previous_loaded, previous_preload = {}, {}
+    for _, name in ipairs(module_names) do
+        previous_loaded[name] = package.loaded[name]
+        previous_preload[name] = package.preload[name]
+        package.loaded[name] = nil
+    end
+
+    local production_resources = {
+        items={}, buffs={}, job_abilities={}, weapon_skills={}, spells={},
+        elements={}, zones={}, jobs={}, bags={},
+    }
+    local resource_builds = 0
+    local production_settings = {
+        load=function(who, defaults)
+            return {marker='production', who=who, defaults=defaults}
+        end,
+        save=function() return true end,
+    }
+    local production_primitives = {
+        new=function(settings)
+            local p = {
+                position_x=settings.position_x or 0, position_y=settings.position_y or 0,
+                width=settings.width or 0, height=settings.height or 0,
+                color=settings.color or 0, visible=settings.visible == true,
+            }
+            function p:destroy() return true end
+            return p
+        end,
+    }
+    local viewport_device = {
+        GetViewport=function()
+            return 0, {Width=2560, Height=1440}
+        end,
+    }
+
+    package.preload['ashita.settings'] = function() return production_settings end
+    package.preload['ashita.resources'] = function()
+        return {
+            production=function(received_core)
+                a.equal(received_core, core, 'resource builder must receive the active AshitaCore')
+                resource_builds = resource_builds + 1
+                return production_resources
+            end,
+        }
+    end
+    package.preload['ashita.extdata'] = function()
+        return {decode=function(item) return {production_decoded=item} end}
+    end
+    package.preload['primitives'] = function() return production_primitives end
+    package.preload['d3d8'] = function()
+        return {get_device=function() return viewport_device end}
+    end
+    package.preload['socket'] = function()
+        return {gettime=function() return 987.25 end}
+    end
+
+    rawset(_G, 'AshitaCore', core)
+    rawset(_G, 'gData', gData)
+
+    local production_native = native_module.production({scheduler=scheduler})
+    a.equal(resource_builds, 1, 'production native builder must build Ashita resources once')
+    a.equal(production_native.resources, production_resources,
+        'production native adapter must expose the production resource identity')
+    a.deep_equal(production_native.window_settings(), {ui_x_res=2560, ui_y_res=1440},
+        'production viewport must come from Ashita d3d8')
+    a.equal(production_native.gettime(), 987.25,
+        'production wall clock must use LuaSocket gettime')
+    a.deep_equal(production_native.decode_item(raw), {production_decoded=raw},
+        'production extdata decode must route through the Ashita extdata adapter')
+    local production_loaded = production_native.load_config(
+        'data/Tester/settings.xml', {visible=true})
+    a.equal(production_loaded.marker, 'production',
+        'production settings must route through ashita.settings')
+
+    rawset(_G, 'AshitaCore', previous_core)
+    rawset(_G, 'gData', previous_gdata)
+    for _, name in ipairs(module_names) do
+        package.loaded[name] = previous_loaded[name]
+        package.preload[name] = previous_preload[name]
+    end
 end
