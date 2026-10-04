@@ -1,10 +1,11 @@
 local a = require('tests.lib.assertions')
 local lac_data = require('ashita.lac_data')
 
-local function provider(action)
+local function provider(action, pet_action)
     local target = {Id=99, Index=7, Name='Target', Distance=4.5, Status='Engaged', Type='Monster', HPP=88}
     return {
         GetAction=function() return action end,
+        GetPetAction=function() return pet_action end,
         GetActionTarget=function() return target end,
         GetTarget=function() return target end,
         GetPlayer=function() return {Name='Tester', MainJob='WAR', MainJobLevel=99, MainJobSync=99,
@@ -44,6 +45,34 @@ return function()
     a.equal(lac_data.action(provider({ActionType='Ability',Name='Light Shot',Id=1,Type='Quick Draw'})).type,'CorsairShot')
     a.equal(lac_data.action(provider({ActionType='Spell',Name='Cure',Id=1,Type='White Magic'})).type,'WhiteMagic')
     a.equal(lac_data.action(provider(nil)), nil)
+    -- Pinned LAC GetPetAction is a separate shape from GetAction and does not expose a
+    -- target. Normalize only fields that LAC actually supplies into the GearSwap pet spell.
+    local pet_spell = lac_data.pet_action(provider(nil, {
+        ActionType='Spell', Name='Fire II', Id=145, Type='Black Magic',
+        Skill='Elemental Magic', Element='Fire', CastTime=2250, Recast=9000, MpCost=24,
+    }))
+    a.equal(pet_spell.name, 'Fire II'); a.equal(pet_spell.english, 'Fire II')
+    a.equal(pet_spell.id, 145); a.equal(pet_spell.action_type, 'Magic')
+    a.equal(pet_spell.type, 'BlackMagic'); a.equal(pet_spell.prefix, '/pet')
+    a.equal(pet_spell.skill, 'Elemental Magic'); a.equal(pet_spell.element, 'Fire')
+    a.equal(pet_spell.cast_time, 2250); a.equal(pet_spell.recast, 9000)
+    a.equal(pet_spell.mp_cost, 24); a.equal(pet_spell.target, nil)
+
+    local pet_ability = lac_data.pet_action(provider(nil, {
+        ActionType='Ability', Name='Predator Claws', Id=173, Type='Blood Pact: Rage',
+    }))
+    a.equal(pet_ability.name, 'Predator Claws'); a.equal(pet_ability.english, 'Predator Claws')
+    a.equal(pet_ability.action_type, 'Ability'); a.equal(pet_ability.type, 'BloodPactRage')
+    a.equal(pet_ability.prefix, '/pet')
+
+    local pet_mobskill = lac_data.pet_action(provider(nil, {
+        ActionType='MobSkill', Name='Swooping Frenzy', Id=999,
+    }))
+    a.equal(pet_mobskill.name, 'Swooping Frenzy'); a.equal(pet_mobskill.english, 'Swooping Frenzy')
+    a.equal(pet_mobskill.id, 999); a.equal(pet_mobskill.action_type, 'Monster Move')
+    a.equal(pet_mobskill.prefix, '/pet')
+    a.equal(lac_data.pet_action(provider(nil, nil)), nil)
+
     local p = lac_data.player(provider()); a.equal(p.name, 'Tester'); a.equal(p.main_job, 'WAR'); a.equal(p.is_moving, true)
     local pet = lac_data.pet(provider()); a.equal(pet.id, 44); a.equal(pet.name, 'Pet')
     local world = lac_data.world(provider()); a.equal(world.day, 'Firesday'); a.equal(world.weather, 'Fire x2')
