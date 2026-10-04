@@ -355,6 +355,7 @@ function M.new(deps)
         runtime_events=runtime_events,
         action_runtime=action_runtime,
         pet_runtime=pet_runtime,
+        command_runtime=command_runtime,
         state_runtime=state_runtime,
         backend=backend,
     }
