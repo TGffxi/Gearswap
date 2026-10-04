@@ -2,6 +2,7 @@ local platform_module = require('ashita.platform')
 local runtime_events_module = require('ashita.runtime_events')
 local lifecycle_module = require('ashita.lifecycle')
 local action_runtime_module = require('ashita.action_runtime')
+local pet_runtime_module = require('ashita.pet_runtime')
 local state_runtime_module = require('ashita.state_runtime')
 local equip_backend_module = require('ashita.equip_backend')
 local bootstrap = require('ashita.bootstrap')
@@ -161,6 +162,22 @@ function M.new(deps)
     env.texts = deps.texts or texts_compat.new(fonts)
     env._global = env._global or {}
 
+    -- GearSwap exposes pet_midaction to user code from the moment the job environment is
+    -- created. The concrete runtime is attached after Rahvin's globals have loaded; until
+    -- then the query is safely false. Passing false reproduces GearSwap's explicit clear.
+    local pet_runtime
+    env.pet_midaction = function(value)
+        if value == false then
+            if pet_runtime then pet_runtime:clear() end
+            return false
+        end
+        if value ~= nil and type(value) ~= 'boolean' then
+            error('RahvinCompatError:pet_midaction_argument', 2)
+        end
+        if not pet_runtime or not pet_runtime:is_active() then return false end
+        return true, pet_runtime:current()
+    end
+
     capture_snapshot = function(data)
         local value = snapshot_source(data)
         seed_environment(env, value)
@@ -238,10 +255,13 @@ function M.new(deps)
     engine.status_change = function(...) return invoke_env(env, 'status_change', ...) end
     engine.buff_change = function(...) return invoke_env(env, 'buff_change', ...) end
     engine.pet_change = function(...) return invoke_env(env, 'pet_change', ...) end
+    engine.pet_midcast = function(...) return invoke_env(env, 'pet_midcast', ...) end
+    engine.pet_aftercast = function(...) return invoke_env(env, 'pet_aftercast', ...) end
     engine.sub_job_change = function(...) return invoke_env(env, 'sub_job_change', ...) end
     engine.is_busy = function() return env.is_Busy == true end
 
     local action_runtime = action_runtime_module.new(engine, deps.clock)
+    pet_runtime = pet_runtime_module.new(engine)
     local state_runtime = state_runtime_module.new(engine, platform)
 
     local lifecycle
@@ -277,6 +297,7 @@ function M.new(deps)
         backend=backend,
         engine=engine,
         action_runtime=action_runtime,
+        pet_runtime=pet_runtime,
         state_runtime=state_runtime,
         lifecycle=lifecycle,
         settings=deps.settings or {},
@@ -292,6 +313,7 @@ function M.new(deps)
         lifecycle=lifecycle,
         runtime_events=runtime_events,
         action_runtime=action_runtime,
+        pet_runtime=pet_runtime,
         state_runtime=state_runtime,
         backend=backend,
     }
