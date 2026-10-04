@@ -8,6 +8,9 @@ return function()
     a.equal(type(keybinds.apply), 'function', 'keybinds.apply production interface must exist')
     a.equal(type(keybinds.clear), 'function', 'keybinds.clear production interface must exist')
     a.equal(type(keybinds.rebind), 'function', 'keybinds.rebind production interface must exist')
+    a.equal(type(keybinds.bridge), 'function', 'keybinds.bridge must translate unchanged Rahvin bind commands')
+    a.equal(type(keybinds.clear_bridged), 'function',
+        'keybinds.clear_bridged must release Rahvin-owned bindings on logout without rebinding them')
 
     local executed = {}
     local service = keybinds.new(function(command)
@@ -108,4 +111,44 @@ return function()
     local bad_key_ok = service.rebind('offensemode', 'ctrl+f5')
     a.equal(bad_key_ok, false, 'Rahvin parser owns human spelling normalization before this adapter')
     a.equal(#executed, before_bad)
+
+    -- Rahvin itself remains the logical binding owner. The bridge only translates its
+    -- bind/unbind commands, but must remember successful translated binds so logout can
+    -- release them even though Rahvin file_unload does not run on the character-select path.
+    local bridged = {}
+    local function bridge_exec(command)
+        bridged[#bridged + 1] = command
+        return true
+    end
+    a.equal(keybinds.bridge('bind f12 gs c OffenseMode', bridge_exec), true)
+    a.equal(keybinds.bridge('bind ~f9 gs c SpellReceived', bridge_exec), true)
+    a.deep_equal(bridged, {
+        '/bind F12 /lac fwd OffenseMode',
+        '/bind +F9 /lac fwd SpellReceived',
+    })
+
+    local before_bridge_clear = #bridged
+    a.equal(keybinds.clear_bridged(bridge_exec), true)
+    a.equal(#bridged, before_bridge_clear + 2,
+        'logout cleanup must release exactly the Rahvin bindings still tracked by the bridge')
+    local released = {
+        [bridged[before_bridge_clear + 1]] = true,
+        [bridged[before_bridge_clear + 2]] = true,
+    }
+    a.equal(released['/unbind F12'], true)
+    a.equal(released['/unbind +F9'], true)
+
+    local after_bridge_clear = #bridged
+    a.equal(keybinds.clear_bridged(bridge_exec), true)
+    a.equal(#bridged, after_bridge_clear,
+        'repeated logout cleanup must not emit duplicate unbinds')
+
+    -- An explicit Rahvin unbind removes that key from the bridge registry, so later lifecycle
+    -- cleanup never unbinds a key Rahvin has already handed back.
+    a.equal(keybinds.bridge('bind ^f10 gs c WeaponLock', bridge_exec), true)
+    a.equal(keybinds.bridge('unbind ^f10', bridge_exec), true)
+    local before_final_clear = #bridged
+    a.equal(keybinds.clear_bridged(bridge_exec), true)
+    a.equal(#bridged, before_final_clear,
+        'Rahvin-released keys must not survive in the bridge cleanup registry')
 end
