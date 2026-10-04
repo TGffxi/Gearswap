@@ -277,6 +277,58 @@ return function()
     a.equal(slot_releases, 1)
     a.equal(type(ipc_listener), 'function', 'lifecycle IPC generation must attach to the shared platform')
 
+    -- Wave 4 integration: the snapshot diff must drive Rahvin's separately registered
+    -- numeric Windower buff event before the GearSwap buff_change callback.
+    local wave4_order = {}
+    graph.env.windower.register_event('gain buff', function(id)
+        wave4_order[#wave4_order + 1] = {'gain', id}
+    end)
+    local original_buff_change = graph.env.buff_change
+    graph.env.buff_change = function(name, gain)
+        wave4_order[#wave4_order + 1] = {'buff', name, gain}
+    end
+
+    graph.state_runtime:update({
+        player={status='Idle', sub_job='SAM'}, buffs={}, pet={isvalid=false},
+    })
+    graph.state_runtime:update({
+        player={status='Idle', sub_job='SAM'},
+        buffs={{id=777,name='Wave Four Buff'}}, pet={isvalid=false},
+    })
+    a.deep_equal(wave4_order[1], {'gain',777},
+        'state diff must emit the numeric Windower gain-buff event first')
+    a.deep_equal(wave4_order[2], {'buff','Wave Four Buff',true},
+        'ordinary GearSwap buff_change must follow the numeric event')
+    graph.env.buff_change = original_buff_change
+
+    -- Rahvin owns the subjob refresh behavior. The adapter only detects the real transition
+    -- and calls it once; its three delayed trait/rebuild callbacks must land on the exact
+    -- scheduler instance already used by lifecycle/startup work.
+    local subjobs = {}
+    graph.env.sub_job_change_custom = function(new, old)
+        subjobs[#subjobs + 1] = {new, old}
+    end
+    local scheduled_before_subjob = #scheduled
+    graph.state_runtime:update({
+        player={status='Idle', sub_job='DNC'},
+        buffs={{id=777,name='Wave Four Buff'}}, pet={isvalid=false},
+    })
+    a.deep_equal(subjobs, {{'DNC','SAM'}},
+        'real subjob transition must reach unchanged Rahvin sub_job_change exactly once')
+    a.equal(#scheduled, scheduled_before_subjob + 3,
+        'Rahvin subjob refresh must schedule exactly three callbacks on the shared scheduler')
+    a.equal(scheduled[scheduled_before_subjob + 1].delay, 2)
+    a.equal(scheduled[scheduled_before_subjob + 2].delay, 2.1)
+    a.equal(scheduled[scheduled_before_subjob + 3].delay, 2.2)
+    graph.state_runtime:update({
+        player={status='Idle', sub_job='DNC'},
+        buffs={{id=777,name='Wave Four Buff'}}, pet={isvalid=false},
+    })
+    a.equal(#subjobs, 1, 'identical subjob snapshot must not retrigger Rahvin callback')
+    a.equal(#scheduled, scheduled_before_subjob + 3,
+        'identical subjob snapshot must not schedule duplicate refresh work')
+    graph.env.sub_job_change_custom = nil
+
     -- GearSwap cancellation is action-scoped state, not only a low-level LAC primitive.
     -- cancel_spell() must expose the flag to Rahvin in the same pretarget/precast scope, and
     -- a later action must begin with a fresh false flag rather than inheriting stale cancel.
