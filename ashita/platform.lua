@@ -32,6 +32,14 @@ function M.new(deps)
     if type(on_event_error) ~= 'function' then
         error('RahvinCompatError:platform.on_event_error', 2)
     end
+    local on_event_begin = deps.on_event_begin
+    local on_event_end = deps.on_event_end
+    if on_event_begin ~= nil and type(on_event_begin) ~= 'function' then
+        error('RahvinCompatError:platform.on_event_begin', 2)
+    end
+    if on_event_end ~= nil and type(on_event_end) ~= 'function' then
+        error('RahvinCompatError:platform.on_event_end', 2)
+    end
 
     local iter_bag = require_method(inventory, 'iter_bag', 'inventory.iter_bag')
     local ability_recasts = require_method(recasts, 'abilities', 'recasts.abilities')
@@ -83,34 +91,77 @@ function M.new(deps)
     -- the platform; copying here would let resource state drift between adapters.
     service.resources = native and native.resources or nil
 
-    function service:register_event(name, fn)
+    local function register_event(name, fn, mode)
         if type(name) ~= 'string' or name == '' then
-            error('RahvinCompatError:platform.event_name', 2)
+            error('RahvinCompatError:platform.event_name', 3)
         end
         if type(fn) ~= 'function' then
-            error('RahvinCompatError:platform.event_handler', 2)
+            error('RahvinCompatError:platform.event_handler', 3)
         end
         local list = handlers[name]
         if not list then
             list = {}
             handlers[name] = list
         end
-        list[#list + 1] = fn
+        local entry = {fn=fn, mode=mode}
+        list[#list + 1] = entry
         return fn
+    end
+
+    function service:register_event(name, fn)
+        return register_event(name, fn, 'wrapped')
+    end
+
+    function service:raw_register_event(name, fn)
+        return register_event(name, fn, 'raw')
+    end
+
+    local function begin_event(mode, name)
+        if on_event_begin then
+            local ok, err = pcall(on_event_begin, mode, name)
+            if not ok then
+                pcall(on_event_error, name, err)
+                return false
+            end
+        end
+        return true
+    end
+
+    local function end_event(mode, name)
+        if on_event_end then
+            local ok, err = pcall(on_event_end, mode, name)
+            if not ok then pcall(on_event_error, name, err) end
+        end
     end
 
     function service:emit(name, ...)
         local list = handlers[name]
         if not list then return 0 end
         local snapshot = {}
-        for i = 1, #list do snapshot[i] = list[i] end
+        for i = 1, #list do
+            snapshot[i] = {fn=list[i].fn, mode=list[i].mode}
+        end
         local args = {...}
         local unpack_args = unpack or table.unpack
-        for i = 1, #snapshot do
-            local ok, err = pcall(snapshot[i], unpack_args(args))
-            if not ok then
-                pcall(on_event_error, name, err)
+        local index = 1
+        while index <= #snapshot do
+            local mode = snapshot[index].mode
+            local last = index
+            while last + 1 <= #snapshot and snapshot[last + 1].mode == mode do
+                last = last + 1
             end
+
+            local active = begin_event(mode, name)
+            if active then
+                for i = index, last do
+                    local ok, err = pcall(snapshot[i].fn, unpack_args(args))
+                    if not ok then
+                        pcall(on_event_error, name, err)
+                    end
+                end
+                end_event(mode, name)
+            end
+            index = last + 1
         end
         return #snapshot
     end
