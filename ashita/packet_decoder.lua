@@ -152,6 +152,15 @@ function M.new(source)
         return new_zone, old_zone
     end
 
+    function service.logout(e)
+        if type(e) ~= 'table' then return false end
+        local data = e.data or e.data_modified
+        if type(data) ~= 'string' then return false end
+        -- Pinned Ashita v4 settings.lua logout detector:
+        -- incoming 0x00B is a real logout only when byte +0x04 equals 1.
+        return byte_at(data, 0x04 + 1) == 1
+    end
+
     function service.target_index(_)
         return target_index()
     end
