@@ -238,10 +238,11 @@ function M.new(deps)
     engine.status_change = function(...) return invoke_env(env, 'status_change', ...) end
     engine.buff_change = function(...) return invoke_env(env, 'buff_change', ...) end
     engine.pet_change = function(...) return invoke_env(env, 'pet_change', ...) end
+    engine.sub_job_change = function(...) return invoke_env(env, 'sub_job_change', ...) end
     engine.is_busy = function() return env.is_Busy == true end
 
     local action_runtime = action_runtime_module.new(engine, deps.clock)
-    local state_runtime = state_runtime_module.new(engine)
+    local state_runtime = state_runtime_module.new(engine, platform)
 
     local lifecycle
     local runtime_events = runtime_events_module.new({
