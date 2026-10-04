@@ -263,7 +263,9 @@ return function()
     a.equal(direct_scheduled, false)
 
     local prerenders, ipc_messages = 0, {}
-    graph.env.windower.register_event('prerender', function() prerenders = prerenders + 1 end)
+    -- Keep this observer raw so the later frame assertion measures the unchanged Rahvin raw
+    -- prerender registrations instead of adding a synthetic wrapped refresh to that event.
+    graph.env.windower.raw_register_event('prerender', function() prerenders = prerenders + 1 end)
     graph.env.windower.register_event('ipc message', function(message) ipc_messages[#ipc_messages + 1] = message end)
 
     graph.profile.OnLoad()
