@@ -2,10 +2,11 @@ local packet_decoder = require('ashita.packet_decoder')
 local M = {}
 
 -- Packet ids are pinned against Ashita v4 / LuAshitacast sources used by this port.
--- 0x00A: zone/player initialization, 0x028: incoming action packet.
+-- 0x00A: zone/player initialization, 0x00B: zone exit/logout, 0x028: incoming action packet.
 -- Rahvin's Windower TH death-message hook consumes packet 0x029.
 M.IDS = {
     ZONE = 0x00A,
+    LOGOUT = 0x00B,
     ACTION = 0x028,
     ACTION_MESSAGE = 0x029,
 }
@@ -27,6 +28,7 @@ function M.new(handlers, decoder)
     local action_handler = require_handler(handlers, 'action')
     local main_engine = require_handler(handlers, 'main_engine')
     local target_change = require_handler(handlers, 'target_change')
+    local logout = require_handler(handlers, 'logout')
 
     local previous_target_index = nil
     local service = {}
@@ -61,6 +63,19 @@ function M.new(handlers, decoder)
             -- Target indices are zone-local. The next outgoing tick establishes a fresh
             -- baseline rather than reporting a synthetic target change across zones.
             previous_target_index = nil
+            return true
+        end
+
+        if e.id == M.IDS.LOGOUT then
+            local is_logout
+            if type(decoder.logout) == 'function' then
+                is_logout = decoder.logout(e)
+            else
+                is_logout = e.is_logout == true
+            end
+            if not is_logout then return false end
+            previous_target_index = nil
+            logout()
             return true
         end
 
