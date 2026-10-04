@@ -117,15 +117,37 @@ function M.new(deps)
         end,
     }, {__index=native})
 
+    local backend = equip_backend_module.new(gFunc)
+    local capture_snapshot
+
     local platform = platform_module.new({
         native=native_facade,
         inventory=deps.inventory,
         recasts=deps.recasts,
         ipc_to_rahvin=deps.ipc_to_rahvin,
         on_event_error=deps.on_event_error,
+        on_event_begin=function(mode)
+            -- No GearSwap equip buffer may cross a logical event boundary. Wrapped events
+            -- additionally refresh the user-facing globals once before their handlers.
+            backend:discard()
+            if mode == 'wrapped' then
+                if type(capture_snapshot) ~= 'function' then
+                    error('RahvinCompatError:composition.event_snapshot', 2)
+                end
+                capture_snapshot(gData)
+            elseif mode ~= 'raw' then
+                error('RahvinCompatError:composition.event_mode:' .. tostring(mode), 2)
+            end
+        end,
+        on_event_end=function(mode)
+            if mode == 'wrapped' then
+                backend:flush()
+            else
+                backend:discard()
+            end
+        end,
     })
 
-    local backend = equip_backend_module.new(gFunc)
     local env = environment.new(platform)
     environment.install_runtime(env, platform)
     gearswap.install(env, backend)
@@ -139,7 +161,7 @@ function M.new(deps)
     env.texts = deps.texts or texts_compat.new(fonts)
     env._global = env._global or {}
 
-    local function capture_snapshot(data)
+    capture_snapshot = function(data)
         local value = snapshot_source(data)
         seed_environment(env, value)
         return value
