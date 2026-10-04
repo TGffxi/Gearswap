@@ -12,6 +12,7 @@ return function()
         zone_change=function() end,
         main_engine=function() end,
         target_change=function() end,
+        logout=function() end,
     }
     local service = packets.new(handlers, {action=function(e) return e.decoded_action end})
 
