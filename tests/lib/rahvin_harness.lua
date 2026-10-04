@@ -26,10 +26,13 @@ end
 
 local function make_platform(opts)
     opts = opts or {}
-    local events, scheduled = {}, {}
+    local events, scheduled, chat_lines, saves = {}, {}, {}, {}
     local platform = {
         resources={elements={}, items={}, buffs={}, job_abilities={}, weapon_skills={}, spells={}, zones={}, bags={}, jobs={}},
-        chat=function() end,
+        chat=function(_, mode, message)
+            chat_lines[#chat_lines+1]={mode=mode,message=message}
+            if type(opts.on_chat)=='function' then opts.on_chat(mode,message) end
+        end,
         send_command=function() end,
         send_ipc=function() end,
         input=function() end,
@@ -53,11 +56,18 @@ local function make_platform(opts)
         get_player=function() return {id=1,index=1,name='Tester'} end,
         window_settings=function() return {ui_x_res=1920,ui_y_res=1080} end,
         inject_outgoing=function() end,
-        load_config=function(_,_,defaults)
+        load_config=function(_,path,defaults)
             for key, value in pairs(opts.settings or {}) do defaults[key] = value end
+            if type(opts.load_config)=='function' then
+                return opts.load_config(path, defaults)
+            end
             return defaults
         end,
-        save_config=function() end,
+        save_config=function(_,value)
+            saves[#saves+1]=set_utils.copy(value)
+            if type(opts.save_config)=='function' then return opts.save_config(value) end
+            return true
+        end,
         decode_item=function() return {} end,
         new_file=function(_, path)
             return {path=path, exists=function() return false end, read=function() return nil end}
@@ -68,6 +78,8 @@ local function make_platform(opts)
     end
     platform._events=events
     platform._scheduled=scheduled
+    platform._chat=chat_lines
+    platform._saves=saves
     return platform
 end
 
